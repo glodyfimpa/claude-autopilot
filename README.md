@@ -46,6 +46,18 @@ The PreToolUse hook blocks dangerous operations:
 - **Always active:** blocks editing `.env` files
 - **With autopilot ON:** also blocks credential files (`.pem`, `.key`, `id_rsa`), system directories (`/etc/`, `/usr/local/`), and destructive commands (`rm -rf /`, `git push --force`, `DROP TABLE`, `chmod 777`, `curl | bash`)
 
+## Permissions
+
+On `/autopilot on`, the plugin auto-detects your stack and adds permission allowlist rules to `~/.claude/settings.local.json` for the gate commands (e.g., `npm test`, `npm run lint`). This lets Claude run quality checks without prompting you each time.
+
+On `/autopilot off`, the added rules are removed automatically.
+
+For fully autonomous mode (no prompts at all), restart Claude Code with:
+
+```bash
+claude --permission-mode auto
+```
+
 ## Coexistence with Ralph Loop
 
 When Ralph Loop is active in the same session, the autopilot defers automatically. Both plugins can be enabled simultaneously without conflicts.

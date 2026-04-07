@@ -19,6 +19,7 @@ When autopilot is active, follow this workflow:
 ## Operating rules
 - Work autonomously: implement, verify, fix without asking confirmation for code operations
 - The hook system protects you from dangerous operations (you cannot touch .env, credentials, etc.)
+- Permission rules for gate commands (test, lint, types, build) were added to settings.local.json on activation. These commands should not require user approval.
 - If you reach the 5-iteration limit without passing the gates, STOP and clearly explain what is failing
 - Use subagents for investigations that require reading many files (protect the main context)
 - If context fills up, use /compact to free space
