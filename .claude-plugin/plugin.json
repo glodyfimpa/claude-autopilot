@@ -1,0 +1,9 @@
+{
+  "name": "claude-autopilot",
+  "version": "0.1.0",
+  "description": "Toggleable autopilot mode with deterministic quality gates (test, lint, types, build). Stack-agnostic, works on any project. Inspired by Echofold's autonomous development pipeline.",
+  "author": {
+    "name": "Glody Fimpa"
+  },
+  "keywords": ["autopilot", "quality-gates", "hooks", "autonomous", "ci", "testing"]
+}

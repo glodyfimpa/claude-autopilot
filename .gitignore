@@ -1,0 +1,10 @@
+.claude/*.local.md
+.claude/*.local.json
+.claude/plans/
+.claude/memory/
+.claude/worktrees/
+.claude/todos/
+CLAUDE.md
+.DS_Store
+.vscode/
+*.log
