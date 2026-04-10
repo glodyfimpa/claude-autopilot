@@ -10,6 +10,10 @@
 
 : "${CLAUDE_SETTINGS_PATH:=$HOME/.claude/settings.json}"
 
+MCP_DETECTOR_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "$MCP_DETECTOR_SELF_DIR/known-providers.sh"
+
 # Detect the git hosting provider from the 'origin' remote URL.
 # Prints one of: github, gitlab, bitbucket, unknown, none
 detect_git_host() {
@@ -115,26 +119,20 @@ suggest_prd_source_provider() {
   echo "local-file"
 }
 
-# List all known providers for a given pipeline stage.
-# Returns non-zero for unknown stages.
+# List all known providers for a given pipeline stage. Returns non-zero for
+# unknown stages. Sources of truth live in lib/known-providers.sh.
 list_available_providers_for_stage() {
-  local stage="$1"
+  local stage="$1" list
   case "$stage" in
-    pr-target)
-      printf '%s\n' github gitlab bitbucket
-      ;;
-    task-storage)
-      printf '%s\n' notion jira linear backlog local-file chat-paste
-      ;;
-    prd-source)
-      printf '%s\n' local-file chat-paste notion jira google-drive
-      ;;
-    parallelization)
-      printf '%s\n' adaptive always-sequential always-parallel
-      ;;
+    pr-target)       list="$PR_ADAPTER_KNOWN_PROVIDERS" ;;
+    task-storage)    list="$TASK_STORAGE_KNOWN_PROVIDERS" ;;
+    prd-source)      list="$PRD_SOURCE_KNOWN_PROVIDERS" ;;
+    parallelization) list="$PARALLELIZATION_KNOWN_STRATEGIES" ;;
     *)
       echo "unknown stage: $stage" >&2
       return 1
       ;;
   esac
+  # shellcheck disable=SC2086
+  printf '%s\n' $list
 }
