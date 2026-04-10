@@ -166,34 +166,25 @@ _task_storage_local_file_parse() {
     esac
   done < "$file"
 
-  # Build a JSON array from the pipe-delimited criteria list without relying
-  # on GNU-only features (BSD awk does not support multi-char RS).
-  # Split manually in bash and feed each item to jq -R . to get proper escaping.
-  local criteria_json="[]"
-  if [[ -n "$criteria_csv" ]]; then
-    local items=()
-    local remaining="$criteria_csv"
-    while [[ "$remaining" == *"|||"* ]]; do
-      items+=("${remaining%%|||*}")
-      remaining="${remaining#*|||}"
-    done
-    items+=("$remaining")
-    criteria_json="$(printf '%s\n' "${items[@]}" | jq -R . | jq -s '.')"
-  fi
-
+  # BSD awk does not support multi-char RS, so pass the raw pipe-delimited
+  # list to jq and let jq do the splitting + object construction in one call.
   jq -n \
     --arg id "$id" \
     --arg title "$title" \
     --arg description "$description" \
     --arg status "$status" \
     --arg parent "$parent" \
-    --argjson criteria "$criteria_json" \
+    --arg criteria_raw "$criteria_csv" \
     '{
       id: $id,
       title: $title,
       description: $description,
       status: $status,
       parent: (if $parent == "" then null else $parent end),
-      acceptanceCriteria: $criteria
+      acceptanceCriteria: (
+        if $criteria_raw == "" then []
+        else ($criteria_raw | split("|||"))
+        end
+      )
     }'
 }

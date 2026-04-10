@@ -10,44 +10,25 @@
 
 BRANCH_SLUG_MAX=40
 
-# Transform a free-form title into a kebab-case slug suitable for a git branch.
+# slugify <title>
+#   Transform a free-form title into a kebab-case slug bounded by
+#   BRANCH_SLUG_MAX. Returns "untitled" for empty input.
 #
-# Rules:
-#   - lowercase
-#   - ASCII only (strip diacritics and non-alphanumeric)
-#   - collapse multiple separators into a single '-'
-#   - trim leading/trailing '-'
-#   - truncate to BRANCH_SLUG_MAX chars without leaving a trailing '-'
-#   - return "untitled" if the input is empty after normalization
-#
-# TODO (user contribution): implement the slug transformation.
-# This function receives a string in "$1" and must print the slug on stdout.
-# Consider:
-#   - macOS's 'iconv -t ASCII//TRANSLIT' handles diacritics (é -> e).
-#   - 'tr' and 'sed' are enough for the rest.
-#   - Edge cases to respect (covered by the tests):
-#     * Multiple spaces/dashes collapse to one
-#     * Punctuation ("can't", "urgent!") becomes a separator, not a joined char
-#     * Truncation must not leave a dangling '-' at the end
-#     * Empty / whitespace-only input returns "untitled"
+# iconv falls back to the raw input when TRANSLIT is unavailable; the
+# subsequent tr + sed still strips anything that isn't [a-z0-9-].
 slugify() {
   local input="$1"
   local slug
-  # Transliterate to ASCII (strip diacritics like é -> e)
   slug="$(printf '%s' "$input" | iconv -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null || printf '%s' "$input")"
-  # Lowercase, replace every non [a-z0-9] run with a single '-', trim edges
   slug="$(printf '%s' "$slug" \
     | tr '[:upper:]' '[:lower:]' \
     | tr -c 'a-z0-9' '-' \
-    | sed -e 's/-\{2,\}/-/g' -e 's/^-//' -e 's/-$//')"
-  # Truncate to BRANCH_SLUG_MAX and trim any trailing '-' left by the cut
+    | sed -e 's/--*/-/g' -e 's/^-//' -e 's/-$//')"
   if [[ ${#slug} -gt $BRANCH_SLUG_MAX ]]; then
     slug="${slug:0:$BRANCH_SLUG_MAX}"
     slug="${slug%-}"
   fi
-  if [[ -z "$slug" ]]; then
-    slug="untitled"
-  fi
+  [[ -z "$slug" ]] && slug="untitled"
   printf '%s\n' "$slug"
 }
 
