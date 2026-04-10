@@ -1,26 +1,82 @@
 ---
 name: autopilot
-description: Autopilot mode with deterministic quality gates. Loaded when user activates /autopilot on
+description: Autopilot mode with deterministic quality gates and full PRD→PR pipeline. Loaded when user activates /autopilot on or invokes /autopilot-task, /autopilot-sprint, /autopilot-prd, /autopilot-run
 ---
 
 # Autopilot Mode
 
-When autopilot is active, follow this workflow:
+When autopilot is active, follow this workflow.
 
-## Work cycle
-1. ANALYZE the task before writing code (read relevant files, understand context)
-2. PLAN the changes (files to modify, order, dependencies between files)
-3. IMPLEMENT in logical, coherent blocks
-4. The Stop hook will automatically verify: test, lint, types, build
-5. If the stop hook blocks you, read the error and fix the specific problem
-6. After all gates pass, launch the security-reviewer agent: "use a security-reviewer subagent to check the changes"
-7. Create a commit with a descriptive message
+## Inner loop — implement + verify
 
-## Operating rules
-- Work autonomously: implement, verify, fix without asking confirmation for code operations
-- The hook system protects you from dangerous operations (you cannot touch .env, credentials, etc.)
-- Permission rules for gate commands (test, lint, types, build) were added to settings.local.json on activation. These commands should not require user approval.
-- If you reach the 5-iteration limit without passing the gates, STOP and clearly explain what is failing
-- Use subagents for investigations that require reading many files (protect the main context)
-- If context fills up, use /compact to free space
-- Never skip gates: if tests don't exist, create them before implementing the feature
+Used by `/autopilot-task` and every subagent spawned by `/autopilot-sprint`. The goal is: bring ONE task from "ready" to "done" through the quality gates, then signal completion so the outer loop can open a PR.
+
+### Work cycle
+
+1. **ANALYZE** the task before writing code. Read the relevant files, understand the surrounding context, map out dependencies.
+2. **PLAN** the changes: which files to modify, in what order, and how they depend on each other.
+3. **IMPLEMENT** in logical, coherent blocks. Never mix unrelated edits into the same iteration.
+4. The Stop hook automatically runs the quality gates: `test`, `lint`, `types`, `build`. The specific commands come from the detected stack.
+5. If the Stop hook blocks you, read the error carefully and fix the specific problem. Do not rewrite large sections hoping to "make it work".
+6. When all gates pass AND every acceptance criterion is satisfied, call the `security-reviewer` subagent: *"use a security-reviewer subagent to check the changes"*.
+7. When the security review has no blocking findings, write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
+
+### Task-complete marker
+
+The marker is a zero-byte file at `~/.claude/.autopilot-task-complete`. Write it with:
+
+```bash
+: > ~/.claude/.autopilot-task-complete
+```
+
+When the Stop hook sees this marker, it emits a "task complete" signal instead of forcing another gate cycle. The outer loop (`/autopilot-task`) picks up the signal, commits, pushes, and opens the PR. After the outer loop finishes, the marker is removed.
+
+**Do not write the marker until all of the following are true:**
+- Every acceptance criterion is satisfied by code (not by comments or TODOs).
+- All quality gates pass (`test`, `lint`, `types`, `build`).
+- The security-reviewer subagent returned no blocking findings.
+- The working tree has real changes to commit.
+
+### Operating rules
+
+- Work autonomously: implement, verify, and fix without asking for confirmation on routine code operations.
+- The hook system protects you from dangerous operations (you cannot touch `.env`, credentials, etc.).
+- Permission rules for the gate commands were added to `settings.local.json` on activation, so they should not require user approval.
+- If you reach the 5-iteration limit without passing the gates, STOP and clearly explain what is failing. Do not write the task-complete marker.
+- Use subagents for investigations that require reading many files — this protects the main context window.
+- If context fills up, use `/compact` to free space.
+- Never skip gates: if tests don't exist, create them before implementing the feature.
+
+## Outer loop — full pipeline
+
+The outer loop is orchestrated by the slash commands, not by this skill directly. Reference:
+
+- `/autopilot-configure` first-run wizard that writes `.autopilot-pipeline.json`.
+- `/autopilot-prd <ref>` read a PRD from the configured source, decompose it into tasks, and persist them into the configured task storage.
+- `/autopilot-task <ref>` run one task through the inner loop, then commit + push + open a PR on the configured PR target.
+- `/autopilot-sprint [filter]` list every ready task, estimate complexity, plan execution (sequential or parallel), and run all of them.
+- `/autopilot-run <prd_ref>` chain `/autopilot-prd` and `/autopilot-sprint` in one shot.
+
+### Branch strategy (Echofold)
+
+Every task runs on its own branch, always created from `main`:
+
+- Feature: `feat/{PROJECT}-{ticket}-{slug}`
+- Fix: `fix/{PROJECT}-{ticket}-{slug}`
+
+`{PROJECT}` defaults to the repo name in uppercase if no prefix is configured. `{ticket}` comes from the task storage provider (id, key, or a timestamp). `{slug}` is a kebab-case version of the task title, max 40 chars.
+
+Never reuse an existing branch. Never branch from a feature branch (worktree subagents are the only exception, and they still root-check against `main`).
+
+### Parallelization (Phase 4)
+
+When `/autopilot-sprint` runs with strategy `adaptive` or `always-parallel`, tasks are grouped by shared-file dependencies and distributed across worktrees. Hard cap defaults to 3 concurrent lanes. Each lane runs this same inner loop inside an isolated worktree.
+
+## Pipeline recap
+
+```
+PRD source → decomposition → task storage → task execution → PR target
+  (adapter)       (Claude)        (adapter)       (adapter)       (adapter)
+```
+
+Every stage is provider-agnostic: local files, chat paste, Notion, Jira, Linear, Backlog, GitHub, GitLab, Bitbucket are all plug-and-play. The configuration lives in `.autopilot-pipeline.json` at the project root.

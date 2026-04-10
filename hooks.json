@@ -1,5 +1,5 @@
 {
-  "description": "Autopilot quality gates: Stop hook runs test/lint/types/build, PreToolUse blocks dangerous operations",
+  "description": "Autopilot quality gates + full PRD→PR pipeline. Stop hook runs test/lint/types/build, PreToolUse blocks dangerous ops, SubagentStop tracks parallel sprint runs",
   "hooks": {
     "Stop": [
       {
@@ -20,6 +20,18 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/pretool-gate.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop.sh",
             "timeout": 5000
           }
         ]
