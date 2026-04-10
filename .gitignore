@@ -1,3 +1,4 @@
+# Claude Code local state
 .claude/*.local.md
 .claude/*.local.json
 .claude/plans/
@@ -5,6 +6,23 @@
 .claude/worktrees/
 .claude/todos/
 CLAUDE.md
+
+# Autopilot state generated when the plugin is run from inside its own repo
+.autopilot-pipeline.json
+tasks/
+
+# OS / editor noise
 .DS_Store
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# sed -i.bak safety net + merge leftovers
+*.bak
+*.orig
+*.rej
+
+# Logs
 *.log

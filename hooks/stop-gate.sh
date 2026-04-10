@@ -110,9 +110,23 @@ if [[ -n "$ERRORS" ]]; then
 $TRUNCATED_ERRORS" \
     '{"decision":"block","reason":$reason,"systemMessage":$msg}'
   exit 0
-else
-  # All gates passed: reset and approve
-  rm -f "$STATE_FILE"
-  echo '{"decision":"approve","systemMessage":"AUTOPILOT: All quality gates passed (test, lint, types, build). Remember to launch security-reviewer before the final commit."}'
+fi
+
+# All gates passed: reset iteration counter.
+rm -f "$STATE_FILE"
+
+# Task-complete marker: the skill writes this file when every acceptance
+# criterion is satisfied and security review is clean. Its presence tells the
+# outer loop (/autopilot-task) to proceed with commit + push + PR.
+TASK_COMPLETE_MARKER="$HOME/.claude/.autopilot-task-complete"
+if [[ -f "$TASK_COMPLETE_MARKER" ]]; then
+  rm -f "$TASK_COMPLETE_MARKER"
+  echo '{"decision":"approve","systemMessage":"AUTOPILOT: Task complete. All gates passed AND acceptance criteria satisfied. The outer loop will now commit, push, and open the PR via the configured pr_target provider."}'
   exit 0
 fi
+
+# Gates passed but no task-complete marker: this is an intermediate iteration.
+# The skill keeps working until all acceptance criteria are met and security
+# review is clean; only then does it write the marker.
+echo '{"decision":"approve","systemMessage":"AUTOPILOT: All quality gates passed (test, lint, types, build). If every acceptance criterion is now satisfied, run the security-reviewer subagent and then write the task-complete marker (touch ~/.claude/.autopilot-task-complete) so the outer loop can open the PR."}'
+exit 0
