@@ -1,22 +1,60 @@
-# Claude Autopilot
+```
+             _              _ _       _   
+  __ _ _   _| |_ ___  _ __ (_) | ___ | |_ 
+ / _` | | | | __/ _ \| '_ \| | |/ _ \| __|
+| (_| | |_| | || (_) | |_) | | | (_) | |_ 
+ \__,_|\__,_|\__\___/| .__/|_|_|\___/ \__|
+                     |_|
+```
 
-A Claude Code plugin that turns the editor into a self-driving development loop. It combines two layers:
+A Claude Code plugin for autonomous development.
 
-1. **Quality gates loop** (original feature) — deterministic `test`, `lint`, `types`, `build` checks after every Claude iteration, with stack auto-detection and safe defaults.
-2. **Full PRD→PR pipeline** (v0.2+) — a tool-agnostic orchestrator that reads a PRD, decomposes it into tasks, executes each one on its own branch, and opens one PR per task on the configured host.
+Toggleable quality gates (test, lint, types, build) after every Claude iteration, plus an optional full pipeline that goes from PRD to open pull request in one command. Tool-agnostic at every stage: read PRDs from local files, Notion, Jira, or Google Drive; store tasks in local files, Notion, Jira, Linear, or Backlog; open PRs on GitHub, GitLab, or Bitbucket. Pick the tools you already use, skip the rest.
 
 Inspired by [Echofold's autonomous development pipeline](https://echofold.ai/news/how-to-automate-claude-code-autonomous-development).
 
----
+## Install
 
-## Quick start
+```
+/install-plugin glodyfimpa/claude-autopilot
+```
 
-### 1. Install
+After installing, turn on the quality gates loop:
 
-Add to your `~/.claude/settings.json`:
+```
+/autopilot on
+```
+
+The plugin detects your project stack (Node, Python, Java, Rust, Go) and registers permission rules for the gate commands. To use the full PRD→PR pipeline, run the setup wizard once per project:
+
+```
+/autopilot-configure
+```
+
+The wizard scans active MCPs and the git remote, proposes defaults for each stage, and writes a config file at `.autopilot-pipeline.json` in the project root. Reconfiguring a single stage later is possible with `/autopilot-configure <stage>`.
+
+## Update
+
+```
+/plugin marketplace update claude-autopilot
+```
+
+To receive updates automatically:
+
+1. Run `/plugin`
+2. Go to the **Marketplaces** tab
+3. Select `claude-autopilot`
+4. Select **Enable auto-update**
+
+### Team setup
+
+Pre-enable the plugin in `.claude/settings.json`:
 
 ```json
 {
+  "enabledPlugins": {
+    "claude-autopilot@claude-autopilot": true
+  },
   "extraKnownMarketplaces": {
     "claude-autopilot": {
       "source": {
@@ -28,212 +66,177 @@ Add to your `~/.claude/settings.json`:
 }
 ```
 
-Enable the plugin via `/plugin`.
+## Prerequisites
 
-### 2. Requirements
+claude-autopilot works in three modes depending on which tools you connect:
 
-- `bash` 3.2 or newer (works out of the box on macOS, Linux, WSL, and Git Bash on Windows)
-- `jq` (`brew install jq`, `apt-get install jq`, or equivalent)
-- `git`
-- For the PR target you pick: `gh` for GitHub, `glab` for GitLab, `bb` for Bitbucket
+| Mode | What you run | How it works |
+|------|--------------|--------------|
+| **Gates only** | `/autopilot on` | Stop hook runs test/lint/types/build after every Claude iteration. No pipeline, no PR automation. Works on any project out of the box. |
+| **Full pipeline** | `/autopilot-configure` + pipeline commands | Reads a PRD, decomposes it into tasks, executes each task on its own branch, opens one PR per task on the configured host. |
+| **Chat-only** | `/autopilot-configure` with `chat-paste` providers | No external tools required. Tasks and PRDs live in the conversation; branches and PRs still follow the Echofold convention. |
 
-### 3. Turn on quality gates
+Runtime requirements:
+
+| Category | Required | Notes |
+|----------|----------|-------|
+| Shell | `bash` 3.2+ | Works on macOS (stock bash), Linux, WSL, Git Bash on Windows |
+| JSON | `jq` 1.6+ | `brew install jq` or `apt-get install jq` |
+| Git | `git` 2.20+ | Required by the PR adapter and branch utilities |
+| PR CLI | `gh` for GitHub, `glab` for GitLab, `bb` for Bitbucket | Only the one matching your pr-target provider |
+
+Supported pipeline providers (any tool with an MCP server can be added later):
+
+| Stage | Implemented | Stubs available |
+|-------|-------------|-----------------|
+| PRD source | local-file, chat-paste | notion, jira, google-drive |
+| Task storage | local-file, chat-paste | notion, jira, linear, backlog |
+| PR target | github | gitlab, bitbucket |
+
+## Commands
+
+| Command | Does |
+|---------|------|
+| `/autopilot on` | Detect stack, register permission rules, activate the Stop hook quality gates |
+| `/autopilot off` | Deactivate gates, remove permission rules added on activation |
+| `/autopilot status` | Show whether gates are active, detected stack, iteration count if any |
+| `/autopilot-configure` | First-run wizard for the full pipeline: picks providers for PRD source, task storage, PR target, parallelization |
+| `/autopilot-configure <stage>` | Reconfigure one stage only (e.g. `/autopilot-configure task-storage`) |
+| `/autopilot-prd <ref>` | Read a PRD from the configured source and decompose it into tasks with user approval |
+| `/autopilot-task <ref>` | Run one task end-to-end: branch from main, implement, verify, commit, push, open PR |
+| `/autopilot-sprint` | List every ready task, estimate complexity, plan execution (sequential or parallel worktrees), run the batch |
+| `/autopilot-run <prd_ref>` | Full pipeline in one shot: delegates to `/autopilot-prd` then `/autopilot-sprint` |
+
+## How it works
+
+The plugin has two loops that operate at different scopes.
+
+The **inner loop** is the quality gates cycle. After every Claude iteration the Stop hook reads the detected stack from `hooks/detect-stack.sh` and runs the four gate commands (test, lint, types, build) in sequence. If any gate fails, Claude receives the error output and tries again, up to five iterations per session. If all gates pass and the acceptance criteria for the active task are satisfied, Claude writes a marker file at `~/.claude/.autopilot-task-complete` and the hook emits a task-complete signal. The outer loop picks up the signal to commit, push, and open the PR. Without the marker, gates passing only means "this iteration was clean" and Claude keeps working on the rest of the task.
+
+The **outer loop** is the PRD→PR pipeline and it is driven by four tool-agnostic adapters that live in `lib/`. `prd-source-adapter.sh` reads a spec from wherever it lives (local markdown, pasted chat, Notion page, Jira epic, Google Doc) and returns a normalized JSON object. Claude then decomposes the PRD into tasks interactively with the user and persists them through `task-storage-adapter.sh` to the configured backend. `/autopilot-task` cuts a fresh branch from `main` using the Echofold naming convention (`feat/{PROJECT}-{ticket}-{slug}` or `fix/{PROJECT}-{ticket}-{slug}`), runs the inner loop until the task-complete marker is set, then calls `pr-adapter.sh` to open the PR on the configured host. `/autopilot-sprint` adds the fourth adapter, `parallelization-adapter.sh`, which decides based on task complexity and shared-file dependencies whether to run tasks sequentially or in parallel worktrees.
+
+Every adapter dispatches by naming convention: a single `adapter_dispatch` helper in `lib/adapter-base.sh` looks up `<layer>_<provider>_<action>` and calls it. Adding a new provider means editing one line in `lib/known-providers.sh` and dropping a file under `lib/<layer>-providers/`. The three existing adapters sum to 119 lines of code on top of a 96-line shared base.
+
+## Decision criteria
+
+The plugin enforces a single execution hierarchy: **gates before anything else**. No commit, no push, no PR until the four gates pass on real changes. When gates fail after five iterations, the loop stops and asks the user for help rather than merging broken work.
+
+The task-complete marker is the load-bearing abstraction. It separates "this iteration is clean" from "this task is done". Without it, an automatic PR on the first clean iteration would open pull requests with half-finished features just because the tests happened to compile. The marker is written by the Claude skill only after every acceptance criterion is verified in code and a security review has passed.
+
+Branching is never negotiable: each task starts from `main`, never from a feature branch. Parallel sprint runs use `git worktree add` for isolation and clean up on completion or cancellation.
+
+Complexity estimation favors caution: trivial batches run sequentially (parallel overhead is not worth it), complex tasks force sequential execution (they need full context), and the adaptive strategy parallelizes only when all tasks are standard and share no files with each other.
+
+## Structure
 
 ```
-/autopilot on
+claude-autopilot/                                    the plugin
+├── .claude-plugin/
+│   └── plugin.json                                  plugin manifest
+├── commands/
+│   ├── autopilot.md                                 /autopilot on|off|status
+│   ├── autopilot-configure.md                       /autopilot-configure [stage]
+│   ├── autopilot-prd.md                             /autopilot-prd <ref>
+│   ├── autopilot-task.md                            /autopilot-task <ref>
+│   ├── autopilot-sprint.md                          /autopilot-sprint [filter]
+│   └── autopilot-run.md                             /autopilot-run <prd_ref>
+├── skills/
+│   └── autopilot/
+│       └── SKILL.md                                 inner loop workflow + task-complete marker
+├── hooks/
+│   ├── detect-stack.sh                              stack auto-detection (Node/Java/Python/Rust/Go)
+│   ├── pretool-gate.sh                              PreToolUse: block dangerous operations
+│   ├── stop-gate.sh                                 Stop: quality gates + task-complete marker
+│   └── subagent-stop.sh                             SubagentStop: parallel sprint observability
+├── hooks.json                                       hook registration
+├── lib/
+│   ├── adapter-base.sh                              shared dispatch skeleton for adapters
+│   ├── known-providers.sh                           single source of truth for provider lists
+│   ├── config.sh                                    read/write .autopilot-pipeline.json
+│   ├── branch-utils.sh                              Echofold branch naming, slugify, create from main
+│   ├── mcp-detector.sh                              scan enabled MCPs and git remote
+│   ├── wizard.sh                                    non-interactive wizard helpers
+│   ├── complexity-estimator.sh                      task tier scoring (trivial/standard/complex/epic)
+│   ├── parallelization-adapter.sh                   plan execution: sequential vs parallel
+│   ├── prd-source-adapter.sh                        PRD source dispatcher
+│   ├── prd-source-providers/                        local-file, chat-paste, notion, jira, google-drive
+│   ├── task-storage-adapter.sh                      task storage dispatcher
+│   ├── task-storage-providers/                      local-file, chat-paste, notion, jira, linear, backlog
+│   ├── pr-adapter.sh                                PR target dispatcher
+│   └── pr-providers/                                github, gitlab, bitbucket
+├── tests/
+│   ├── helpers/
+│   │   └── test_helper.bash                         bats helpers: tmpdir, fake git repo, assertions
+│   └── lib/
+│       └── *.bats                                   one bats file per lib module (107 tests)
+├── CONTRIBUTING.md                                  TDD workflow, portability rules, adding providers
+└── README.md
 ```
 
-This detects the stack, registers permission rules for the gate commands, and activates the Stop hook.
+6 commands, 1 skill, 4 hooks, 10 library modules, 16 provider files (6 implemented, 10 stubs), 107 bats tests.
 
-### 4. Configure the pipeline (one-off per project)
-
-```
-/autopilot-configure
-```
-
-The wizard detects your MCPs and git remote, proposes sensible defaults, and writes everything to `.autopilot-pipeline.json` in the project root. Rerun at any time to reconfigure a single stage (`/autopilot-configure task-storage`).
-
-### 5. Run something
+User config (generated by `/autopilot-configure`, not in the plugin):
 
 ```
-/autopilot-task tasks/t1.md             # execute one task end-to-end
-/autopilot-prd prd/checkout.md          # decompose a PRD into tasks
-/autopilot-sprint                       # run every ready task in the storage
-/autopilot-run prd/checkout.md          # full pipeline: PRD → tasks → PRs
+.autopilot-pipeline.json                             per-project pipeline config
+~/.claude/.autopilot-enabled                         gates-loop on/off marker
+~/.claude/.autopilot-task-complete                   task-complete signal (transient)
+~/.claude/.autopilot-<session>.json                  per-session iteration counter
 ```
-
----
-
-## Architecture
-
-The pipeline is made of four tool-agnostic adapters. Each one dispatches to a pluggable provider; the selection lives in `.autopilot-pipeline.json`.
-
-```
-PRD source ──▶ decomposition ──▶ task storage ──▶ task execution ──▶ PR target
-  (adapter)      (Claude LLM)       (adapter)         (adapter)         (adapter)
-                                                          │
-                                                          ▼
-                                                 parallelization
-                                                    (adapter)
-```
-
-### PRD source adapter (`lib/prd-source-adapter.sh`)
-
-Reads a Product Requirements Document and returns a normalized JSON object. Providers:
-
-| Provider | Status | Ref semantics |
-|---|---|---|
-| `local-file` | ✅ | Path to a markdown file |
-| `chat-paste` | ✅ | Raw PRD text |
-| `notion` | stub | Notion page id (requires Notion MCP) |
-| `jira` | stub | Jira epic key (requires Atlassian MCP) |
-| `google-drive` | stub | Google Doc id (requires Google Drive MCP) |
-
-### Task storage adapter (`lib/task-storage-adapter.sh`)
-
-Persists and retrieves decomposed tasks. Providers:
-
-| Provider | Status | Notes |
-|---|---|---|
-| `local-file` | ✅ | Markdown files with YAML frontmatter under `tasks/` |
-| `chat-paste` | ✅ | In-conversation, no persistence |
-| `notion` | stub | Database page under a parent |
-| `jira` | stub | Issues in a project |
-| `linear` | stub | Issues in a team |
-| `backlog` | stub | Tickets via the Backlog.md MCP |
-
-### PR target adapter (`lib/pr-adapter.sh`)
-
-Opens the final PR. Providers:
-
-| Provider | Status | CLI required |
-|---|---|---|
-| `github` | ✅ | `gh` |
-| `gitlab` | stub | `glab` |
-| `bitbucket` | stub | `bb` |
-
-### Parallelization adapter (`lib/parallelization-adapter.sh`)
-
-Decides how a batch of tasks should run. Strategies:
-
-- `adaptive` (default) — trivial batches run sequentially; mixed batches with complex tasks also run sequentially; all-standard batches run in parallel up to `max_concurrency`.
-- `always-sequential` — one task at a time, no matter what.
-- `always-parallel` — every task goes into a parallel lane, grouped by shared-file dependencies.
-
-Complexity tiers come from `lib/complexity-estimator.sh` which scores tasks by number of acceptance criteria and description length.
-
----
-
-## Config file
-
-`.autopilot-pipeline.json` in the project root:
-
-```json
-{
-  "version": 1,
-  "prd_source":      { "provider": "local-file" },
-  "task_storage":    { "provider": "local-file" },
-  "pr_target":       { "provider": "github", "config": { "base_branch": "main" } },
-  "parallelization": { "strategy": "adaptive", "max_concurrency": 3 },
-  "branch_convention": {
-    "project_prefix": "MYAPP",
-    "feature_pattern": "feat/{project}-{ticket}-{slug}",
-    "fix_pattern":     "fix/{project}-{ticket}-{slug}"
-  }
-}
-```
-
-You can edit this by hand or re-run `/autopilot-configure` to update any stage.
-
----
-
-## Quality gates (original feature)
-
-When `/autopilot on` is active, the Stop hook runs the four gates after every Claude iteration. Details below.
-
-### Stacks supported
-
-| Stack | Detection | Test | Lint | Types | Build |
-|-------|-----------|------|------|-------|-------|
-| Node/TypeScript | `tsconfig.json` + `package.json` | `npm test` | `npm run lint` | `npx tsc --noEmit` | `npm run build` |
-| Node/JavaScript | `package.json` | `npm test` | `npm run lint` | — | `npm run build` |
-| Java/Maven | `pom.xml` | `mvn test -q` | — | — | `mvn package -q -DskipTests` |
-| Java/Gradle | `build.gradle` | `./gradlew test` | — | — | `./gradlew build -x test` |
-| Python | `pyproject.toml` / `setup.py` | `pytest` | `ruff` / `flake8` | `pyright` / `mypy` | — |
-| Rust | `Cargo.toml` | `cargo test` | `cargo clippy` | — | `cargo build` |
-| Go | `go.mod` | `go test ./...` | `golangci-lint run` | `go vet ./...` | `go build ./...` |
-
-Unknown stacks pass the gates unchanged.
-
-### Security gates (PreToolUse)
-
-- **Always active:** blocks edits to `.env` files.
-- **With autopilot ON:** also blocks credential files (`.pem`, `.key`, `id_rsa`), system directories (`/etc/`, `/usr/local/`), and destructive commands (`rm -rf /`, `git push --force`, `DROP TABLE`, `chmod 777`, `curl | bash`).
-
-### Iteration limit
-
-Up to 5 consecutive failing iterations per session. After the 5th failure the autopilot stops and asks the user for help.
-
-### Task-complete marker
-
-The outer pipeline (`/autopilot-task`) relies on a marker file (`~/.claude/.autopilot-task-complete`) to distinguish "gates passed for the Nth time" from "this task is actually done". The autopilot skill writes the marker only when:
-
-1. Every acceptance criterion is satisfied by code.
-2. All four gates pass.
-3. The `security-reviewer` subagent returns no blocking findings.
-
-When the Stop hook sees the marker, it emits a "task complete" signal instead of asking for another iteration.
-
----
-
-## Branch strategy
-
-Every task runs on a fresh branch cut from `main`:
-
-- Feature: `feat/{PROJECT}-{ticket}-{slug}`
-- Fix: `fix/{PROJECT}-{ticket}-{slug}`
-
-`{PROJECT}` comes from `branch_convention.project_prefix` (falls back to the repo name). `{ticket}` comes from the task storage provider. `{slug}` is a kebab-case version of the task title, max 40 chars, generated by `lib/branch-utils.sh`.
-
-See `lib/branch-utils.sh` for the exact slug algorithm.
-
----
-
-## Coexistence with Ralph Loop
-
-When Ralph Loop is active in the same session, the Stop hook defers automatically. Both plugins can run together without conflicts.
-
----
 
 ## Portability
 
-The entire plugin runs in plain POSIX-friendly bash with `jq` + `git` as the only mandatory dependencies. Explicitly supported environments:
+The plugin runs on:
 
-- macOS (default `bash` 3.2, BSD coreutils)
+- macOS (stock bash 3.2, BSD coreutils)
 - Linux (bash 4+/5, GNU coreutils)
-- WSL (Ubuntu, Debian, etc.)
+- WSL on Windows
 - Git Bash on Windows
 
-Known portability gotchas the plugin avoids:
+Explicitly avoided features that would break macOS or BSD systems:
 
-- No `${var,,}` (bash 4+). Uses `tr '[:upper:]' '[:lower:]'` instead.
-- No `declare -A` / associative arrays. Uses integer-indexed arrays.
-- No `sed -i ''` vs `sed -i`. Uses `sed -i.bak` + `rm -f *.bak`.
-- No `awk -v RS='multi-char'`. Uses bash string manipulation for delimiters.
+| Avoided | Reason |
+|---------|--------|
+| `${var,,}` / `${var^^}` | bash 4+ only; uses `tr '[:upper:]' '[:lower:]'` instead |
+| `declare -A` | bash 4+ only; uses integer-indexed arrays |
+| `sed -i ''` vs `sed -i` | portable form is `sed -i.bak ... && rm -f *.bak` |
+| `awk -v RS='multi-char'` | BSD awk only supports single-char RS; bash string ops instead |
+| `readlink -f`, `date --iso-8601`, `mapfile` | GNU-only; pure bash equivalents used |
 
----
+See `CONTRIBUTING.md` for the complete list.
 
-## Testing
+## Development
 
-Every `lib/` module is covered by `bats-core` tests in `tests/lib/`. Run them with:
+**This section is for contributors to the plugin codebase, not for end users.** If you installed claude-autopilot with `/install-plugin`, everything is already set up.
 
-```bash
+### TDD workflow
+
+Every `lib/` module is built test-first with [bats-core](https://github.com/bats-core/bats-core). Install bats with `brew install bats-core` on macOS or `apt-get install bats` on Debian.
+
+Run the full suite:
+
+```
 bats tests/lib/
 ```
 
-107 tests pass on macOS bash 3.2 as of v0.2.0. See `CONTRIBUTING.md` for the TDD workflow.
+Current state: 107 tests, all green on macOS bash 3.2.
 
----
+When adding a feature:
+
+1. Write the failing test first in `tests/lib/<module>.bats` (use `tests/helpers/test_helper.bash` for `setup_isolated_tmpdir`, `make_fake_git_repo`, assertions).
+2. Run the test and confirm it fails for the right reason.
+3. Write the minimum implementation in `lib/<module>.sh` that makes the test pass.
+4. Refactor keeping the suite green.
+5. Run the full suite before committing.
+
+### Adding a new provider
+
+1. Create `lib/<layer>-providers/<name>.sh` exposing `<layer>_<name_with_underscores>_<action>` functions.
+2. Add the name to the matching constant in `lib/known-providers.sh`.
+3. Write a new bats test in the corresponding `tests/lib/<layer>-adapter.bats`.
+4. Run `bats tests/lib/`. All tests must stay green before opening a PR.
+
+Full details in `CONTRIBUTING.md`.
 
 ## License
 
