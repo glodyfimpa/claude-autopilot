@@ -15,9 +15,30 @@ Inspired by [Echofold's autonomous development pipeline](https://echofold.ai/new
 
 ## Install
 
+Inside a Claude Code session:
+
 ```
-/install-plugin glodyfimpa/claude-autopilot
+/plugin marketplace add glodyfimpa/claude-autopilot
+/plugin install claude-autopilot@claude-autopilot
 ```
+
+Or from the terminal:
+
+```bash
+claude plugin marketplace add glodyfimpa/claude-autopilot
+claude plugin install claude-autopilot@claude-autopilot
+```
+
+Or interactively inside Claude Code:
+
+```
+/plugin marketplace add glodyfimpa/claude-autopilot
+/plugin
+```
+
+Then go to the **Discover** tab, select `claude-autopilot`, and choose a scope (user, project, or local).
+
+Verify with `/plugin list` (or `claude plugin list`). You should see `claude-autopilot@claude-autopilot — Status: ✔ enabled`. Restart Claude Code after installing so the new slash commands are registered.
 
 After installing, turn on the quality gates loop:
 
