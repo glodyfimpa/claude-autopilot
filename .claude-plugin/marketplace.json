@@ -1,0 +1,17 @@
+{
+  "name": "claude-autopilot",
+  "owner": {
+    "name": "Glody Fimpa",
+    "url": "https://github.com/glodyfimpa"
+  },
+  "plugins": [
+    {
+      "name": "claude-autopilot",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/glodyfimpa/claude-autopilot.git"
+      },
+      "description": "Toggleable autopilot mode with deterministic quality gates (test, lint, types, build) and a full PRD-to-PR pipeline. Stack-agnostic, tool-agnostic at every stage."
+    }
+  ]
+}
