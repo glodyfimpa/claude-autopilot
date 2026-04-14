@@ -65,17 +65,88 @@ EOF
   assert_contains "$log" "--title Test PR"
 }
 
-@test "pr_adapter_create returns clear message for stub providers (gitlab, bitbucket)" {
+@test "pr_adapter_create dispatches to the gitlab provider" {
   config_init
   config_set "pr_target.provider" "gitlab"
-  run pr_adapter_create "feat/TEST-1-hello" "Test PR" "body" "main"
-  assert_equal "2" "$status"
-  assert_contains "$output" "not yet implemented"
+  # Create a fake glab CLI on PATH that records its invocation
+  mkdir -p "$TEST_TMPDIR/bin"
+  cat > "$TEST_TMPDIR/bin/glab" <<'EOF'
+#!/usr/bin/env bash
+# Record the mr create invocation
+echo "glab $*" >> "$TEST_TMPDIR/glab.log"
+# Emulate glab mr create output
+echo "https://gitlab.com/acme/sample/-/merge_requests/42"
+EOF
+  chmod +x "$TEST_TMPDIR/bin/glab"
+  PATH="$TEST_TMPDIR/bin:$PATH"
+  export PATH TEST_TMPDIR
 
-  config_set "pr_target.provider" "bitbucket"
+  run pr_adapter_create "feat/TEST-1-hello" "Test PR" "This is the body" "main"
+  assert_equal "0" "$status"
+  assert_contains "$output" "https://gitlab.com/acme/sample/-/merge_requests/42"
+
+  # Verify glab was invoked with the expected arguments
+  local log
+  log="$(cat "$TEST_TMPDIR/glab.log")"
+  assert_contains "$log" "mr create"
+  assert_contains "$log" "--source-branch feat/TEST-1-hello"
+  assert_contains "$log" "--target-branch main"
+  assert_contains "$log" "--title Test PR"
+  assert_contains "$log" "--description This is the body"
+}
+
+@test "gitlab provider fails gracefully when glab CLI is missing" {
+  config_init
+  config_set "pr_target.provider" "gitlab"
+  # Ensure glab is not on PATH
+  PATH="/usr/bin:/bin"
+  export PATH
+
   run pr_adapter_create "feat/TEST-1-hello" "Test PR" "body" "main"
-  assert_equal "2" "$status"
-  assert_contains "$output" "not yet implemented"
+  assert_equal "1" "$status"
+  assert_contains "$output" "glab CLI is not installed"
+}
+
+@test "pr_adapter_create dispatches to the bitbucket provider" {
+  config_init
+  config_set "pr_target.provider" "bitbucket"
+  # Create a fake bb CLI on PATH that records its invocation
+  mkdir -p "$TEST_TMPDIR/bin"
+  cat > "$TEST_TMPDIR/bin/bb" <<'EOF'
+#!/usr/bin/env bash
+# Record the pr create invocation
+echo "bb $*" >> "$TEST_TMPDIR/bb.log"
+# Emulate bb pr create output
+echo "https://bitbucket.org/acme/sample/pull-requests/42"
+EOF
+  chmod +x "$TEST_TMPDIR/bin/bb"
+  PATH="$TEST_TMPDIR/bin:$PATH"
+  export PATH TEST_TMPDIR
+
+  run pr_adapter_create "feat/TEST-1-hello" "Test PR" "This is the body" "main"
+  assert_equal "0" "$status"
+  assert_contains "$output" "https://bitbucket.org/acme/sample/pull-requests/42"
+
+  # Verify bb was invoked with the expected arguments
+  local log
+  log="$(cat "$TEST_TMPDIR/bb.log")"
+  assert_contains "$log" "pr create"
+  assert_contains "$log" "--source feat/TEST-1-hello"
+  assert_contains "$log" "--destination main"
+  assert_contains "$log" "--title Test PR"
+  assert_contains "$log" "--body This is the body"
+}
+
+@test "bitbucket provider fails gracefully when bb CLI is missing" {
+  config_init
+  config_set "pr_target.provider" "bitbucket"
+  # Ensure bb is not on PATH
+  PATH="/usr/bin:/bin"
+  export PATH
+
+  run pr_adapter_create "feat/TEST-1-hello" "Test PR" "body" "main"
+  assert_equal "1" "$status"
+  assert_contains "$output" "bb CLI is not installed"
 }
 
 # -------- pr_adapter_validate_provider --------
