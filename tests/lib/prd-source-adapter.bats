@@ -106,12 +106,65 @@ Users in low-connectivity regions need the app to queue writes and sync later.
   assert_equal "Offline mode" "$title"
 }
 
-@test "prd_source_fetch returns stub message for notion provider" {
+# -------- Notion provider tests (mocked MCP calls) --------
+
+@test "notion: prd_source_fetch returns normalized PRD JSON from Notion page" {
   config_init
   config_set "prd_source.provider" "notion"
-  run prd_source_fetch "page-id-123"
-  assert_equal "2" "$status"
-  assert_contains "$output" "not yet implemented"
+
+  # Mock the MCP client
+  notion_client_fetch_page() {
+    cat <<'MOCK'
+{
+  "id": "prd-page-123",
+  "properties": {
+    "Name": {"title": [{"plain_text": "Checkout Redesign PRD"}]}
+  },
+  "markdown": "# Checkout Redesign PRD\n\nThe current checkout loses 18% of carts on the payment step.\n\n## Goals\n- Reduce cart abandonment\n- Single-page checkout"
+}
+MOCK
+  }
+
+  run prd_source_fetch "prd-page-123"
+  assert_equal "0" "$status"
+  local title desc_len source_val
+  title="$(echo "$output" | jq -r '.title')"
+  desc_len="$(echo "$output" | jq -r '.description | length')"
+  source_val="$(echo "$output" | jq -r '.metadata.source')"
+  assert_equal "Checkout Redesign PRD" "$title"
+  [[ "$desc_len" -gt 50 ]]
+  assert_equal "notion" "$source_val"
+}
+
+@test "notion: prd_source_fetch falls back to page_id when no title" {
+  config_init
+  config_set "prd_source.provider" "notion"
+
+  notion_client_fetch_page() {
+    cat <<'MOCK'
+{
+  "id": "page-no-title",
+  "properties": {
+    "Name": {"title": []}
+  },
+  "markdown": "Some content without a title property."
+}
+MOCK
+  }
+
+  run prd_source_fetch "page-no-title"
+  assert_equal "0" "$status"
+  local title
+  title="$(echo "$output" | jq -r '.title')"
+  assert_equal "page-no-title" "$title"
+}
+
+@test "notion: prd_source_fetch fails without page_id" {
+  config_init
+  config_set "prd_source.provider" "notion"
+  run prd_source_fetch ""
+  assert_equal "1" "$status"
+  assert_contains "$output" "requires a page id"
 }
 
 @test "prd_source_fetch returns stub message for jira provider" {
