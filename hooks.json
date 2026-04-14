@@ -1,6 +1,18 @@
 {
   "description": "Autopilot quality gates + full PRD→PR pipeline. Stop hook runs test/lint/types/build, PreToolUse blocks dangerous ops, SubagentStop tracks parallel sprint runs",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",

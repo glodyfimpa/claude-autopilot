@@ -170,6 +170,7 @@ claude-autopilot/                                    the plugin
 ├── hooks/
 │   ├── detect-stack.sh                              stack auto-detection (Node/Java/Python/Rust/Go)
 │   ├── pretool-gate.sh                              PreToolUse: block dangerous operations
+│   ├── session-start.sh                              SessionStart: sprint-context injection
 │   ├── stop-gate.sh                                 Stop: quality gates + task-complete marker
 │   └── subagent-stop.sh                             SubagentStop: parallel sprint observability
 ├── hooks.json                                       hook registration
