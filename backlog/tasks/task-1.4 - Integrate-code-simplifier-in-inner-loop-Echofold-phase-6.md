@@ -1,7 +1,7 @@
 ---
 id: TASK-1.4
 title: Integrate code-simplifier in inner loop (Echofold phase 6)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:58'
 labels:

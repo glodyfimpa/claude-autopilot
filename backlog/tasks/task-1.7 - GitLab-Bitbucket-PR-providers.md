@@ -1,7 +1,7 @@
 ---
 id: TASK-1.7
 title: GitLab + Bitbucket PR providers
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:59'
 labels:

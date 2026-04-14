@@ -1,7 +1,7 @@
 {
   "name": "claude-autopilot",
-  "version": "0.1.0",
-  "description": "Toggleable autopilot mode with deterministic quality gates (test, lint, types, build). Stack-agnostic, works on any project. Inspired by Echofold's autonomous development pipeline.",
+  "version": "0.3.0",
+  "description": "Autonomous PRD-to-PR pipeline with quality gates, code quality scanning, CI watchdog, and tool-agnostic adapters for Notion, Jira, Linear, GitHub, GitLab, Bitbucket. Inspired by Echofold's autonomous development pipeline.",
   "author": {
     "name": "Glody Fimpa"
   },

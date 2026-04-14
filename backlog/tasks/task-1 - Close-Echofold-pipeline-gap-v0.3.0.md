@@ -1,7 +1,7 @@
 ---
 id: TASK-1
 title: Close Echofold pipeline gap (v0.3.0)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:56'
 labels:
@@ -19,11 +19,11 @@ Epic tracking all the work needed to bring claude-autopilot from v0.2.0 (foundat
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SonarQube-style code quality adapter implemented with at least one working provider
-- [ ] #2 CI watchdog blocks the task-complete marker until GitHub Actions finishes green
-- [ ] #3 SessionStart hook injects sprint-context.md for parallel subagent runs
-- [ ] #4 code-simplifier skill is invoked automatically in the inner loop
-- [ ] #5 At least one real Notion provider (task-storage or prd-source) replaces the stub
-- [ ] #6 The full v0.3.0 pipeline has been validated end-to-end on a real project
+- [x] #1 SonarQube-style code quality adapter implemented with at least one working provider
+- [x] #2 CI watchdog blocks the task-complete marker until GitHub Actions finishes green
+- [x] #3 SessionStart hook injects sprint-context.md for parallel subagent runs
+- [x] #4 code-simplifier skill is invoked automatically in the inner loop
+- [x] #5 At least one real Notion provider (task-storage or prd-source) replaces the stub
+- [x] #6 The full v0.3.0 pipeline has been validated end-to-end on a real project
 - [ ] #7 Composite plugin score vs Echofold reaches >=8.5/10
 <!-- AC:END -->

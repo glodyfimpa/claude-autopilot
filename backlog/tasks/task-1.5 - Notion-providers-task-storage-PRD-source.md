@@ -1,7 +1,7 @@
 ---
 id: TASK-1.5
 title: 'Notion providers: task-storage + PRD source'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:59'
 labels:

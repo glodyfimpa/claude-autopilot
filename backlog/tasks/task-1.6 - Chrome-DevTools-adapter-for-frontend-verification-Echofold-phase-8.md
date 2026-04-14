@@ -1,7 +1,7 @@
 ---
 id: TASK-1.6
 title: Chrome DevTools adapter for frontend verification (Echofold phase 8)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:59'
 labels:

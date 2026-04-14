@@ -1,7 +1,7 @@
 ---
 id: TASK-1.1
 title: Code quality adapter + SonarQube provider (Echofold phase 7)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:56'
 updated_date: '2026-04-10 12:58'

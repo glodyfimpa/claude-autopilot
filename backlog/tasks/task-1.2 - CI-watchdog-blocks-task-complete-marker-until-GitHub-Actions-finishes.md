@@ -1,7 +1,7 @@
 ---
 id: TASK-1.2
 title: CI watchdog blocks task-complete marker until GitHub Actions finishes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:57'
 updated_date: '2026-04-10 12:58'

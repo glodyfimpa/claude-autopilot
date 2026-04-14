@@ -1,7 +1,7 @@
 ---
 id: TASK-1.8
 title: Jira + Linear task-storage providers
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 13:00'
 labels:
