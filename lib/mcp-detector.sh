@@ -119,6 +119,24 @@ suggest_prd_source_provider() {
   echo "local-file"
 }
 
+# Suggest a provider for the code-quality stage based on active MCPs.
+# Falls back to 'none' when no MCP matches.
+suggest_code_quality_provider() {
+  if _mcp_has_substring "sonarqube" || _mcp_has_substring "sonar"; then
+    echo "sonarqube"
+    return 0
+  fi
+  if _mcp_has_substring "semgrep"; then
+    echo "semgrep"
+    return 0
+  fi
+  if _mcp_has_substring "codeclimate" || _mcp_has_substring "code-climate"; then
+    echo "codeclimate"
+    return 0
+  fi
+  echo "none"
+}
+
 # List all known providers for a given pipeline stage. Returns non-zero for
 # unknown stages. Sources of truth live in lib/known-providers.sh.
 list_available_providers_for_stage() {
@@ -128,6 +146,7 @@ list_available_providers_for_stage() {
     task-storage)    list="$TASK_STORAGE_KNOWN_PROVIDERS" ;;
     prd-source)      list="$PRD_SOURCE_KNOWN_PROVIDERS" ;;
     parallelization) list="$PARALLELIZATION_KNOWN_STRATEGIES" ;;
+    code-quality)    list="$CODE_QUALITY_KNOWN_PROVIDERS" ;;
     *)
       echo "unknown stage: $stage" >&2
       return 1

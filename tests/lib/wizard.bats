@@ -127,7 +127,7 @@ EOF
   assert_equal "0" "$status"
   local keys_count
   keys_count="$(echo "$output" | jq -r '. | keys | length')"
-  assert_equal "4" "$keys_count"
+  assert_equal "5" "$keys_count"
   local pr_default
   pr_default="$(echo "$output" | jq -r '."pr-target".default')"
   assert_equal "github" "$pr_default"
