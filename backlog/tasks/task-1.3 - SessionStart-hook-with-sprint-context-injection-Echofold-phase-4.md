@@ -1,7 +1,7 @@
 ---
 id: TASK-1.3
 title: SessionStart hook with sprint-context injection (Echofold phase 4)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:58'
 labels:
