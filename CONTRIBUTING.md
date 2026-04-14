@@ -99,6 +99,16 @@ bats tests/lib/
 
 All tests must stay green before you open a PR.
 
+## Swapping the code simplifier
+
+The autopilot inner loop invokes a code-simplifier subagent between quality gates and security review. Control this with the `simplify.mode` config key in `.autopilot-pipeline.json`:
+
+- `auto` (default): the inner loop automatically invokes the code-simplifier subagent
+- `manual`: the step is skipped; run `/simplify` yourself when ready
+- `off`: no simplification step at all
+
+To use a custom simplifier plugin instead of the built-in one, set `simplify.mode` to `manual` and invoke your preferred simplifier in your workflow.
+
 ## Branch and commit conventions
 
 The project follows the same Echofold branch strategy it implements:

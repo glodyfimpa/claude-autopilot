@@ -147,6 +147,7 @@ list_available_providers_for_stage() {
     prd-source)      list="$PRD_SOURCE_KNOWN_PROVIDERS" ;;
     parallelization) list="$PARALLELIZATION_KNOWN_STRATEGIES" ;;
     code-quality)    list="$CODE_QUALITY_KNOWN_PROVIDERS" ;;
+    simplify)        list="$KNOWN_SIMPLIFY_MODES" ;;
     *)
       echo "unknown stage: $stage" >&2
       return 1
