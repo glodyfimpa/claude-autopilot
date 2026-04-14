@@ -9,4 +9,5 @@
 PR_ADAPTER_KNOWN_PROVIDERS="github gitlab bitbucket"
 TASK_STORAGE_KNOWN_PROVIDERS="local-file chat-paste notion jira linear backlog"
 PRD_SOURCE_KNOWN_PROVIDERS="local-file chat-paste notion jira google-drive"
+CODE_QUALITY_KNOWN_PROVIDERS="sonarqube semgrep codeclimate none"
 PARALLELIZATION_KNOWN_STRATEGIES="adaptive always-sequential always-parallel"

@@ -10,7 +10,7 @@
 #
 # Depends on lib/config.sh, lib/mcp-detector.sh, lib/known-providers.sh.
 
-WIZARD_KNOWN_STAGES="prd-source task-storage pr-target parallelization"
+WIZARD_KNOWN_STAGES="prd-source task-storage pr-target parallelization code-quality"
 
 _wizard_stage_config_key() {
   case "$1" in
@@ -18,6 +18,7 @@ _wizard_stage_config_key() {
     task-storage)    echo "task_storage.provider" ;;
     pr-target)       echo "pr_target.provider" ;;
     parallelization) echo "parallelization.strategy" ;;
+    code-quality)    echo "code_quality.provider" ;;
     *) return 1 ;;
   esac
 }
@@ -46,6 +47,9 @@ _wizard_default_for_stage() {
       printf '%s\n' "${d:-local-file}" ;;
     parallelization)
       printf 'adaptive\n' ;;
+    code-quality)
+      local d; d="$(suggest_code_quality_provider 2>/dev/null || true)"
+      printf '%s\n' "${d:-none}" ;;
   esac
 }
 

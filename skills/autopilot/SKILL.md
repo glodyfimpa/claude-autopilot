@@ -18,8 +18,9 @@ Used by `/autopilot-task` and every subagent spawned by `/autopilot-sprint`. The
 3. **IMPLEMENT** in logical, coherent blocks. Never mix unrelated edits into the same iteration.
 4. The Stop hook automatically runs the quality gates: `test`, `lint`, `types`, `build`. The specific commands come from the detected stack.
 5. If the Stop hook blocks you, read the error carefully and fix the specific problem. Do not rewrite large sections hoping to "make it work".
-6. When all gates pass AND every acceptance criterion is satisfied, call the `security-reviewer` subagent: *"use a security-reviewer subagent to check the changes"*.
-7. When the security review has no blocking findings, write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
+6. When all gates pass, run the **code quality adapter** (`lib/code-quality-adapter.sh`). The adapter dispatches to the configured provider (SonarQube, Semgrep, CodeClimate, or none) and enters a retry loop: scan, review issues, fix, re-scan, up to 5 iterations. If issues remain after 5 iterations, STOP and report the findings. Do not write the task-complete marker.
+7. When code quality passes (0 issues) AND every acceptance criterion is satisfied, call the `security-reviewer` subagent: *"use a security-reviewer subagent to check the changes"*.
+8. When the security review has no blocking findings, write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
 
 ### Task-complete marker
 
@@ -34,6 +35,7 @@ When the Stop hook sees this marker, it emits a "task complete" signal instead o
 **Do not write the marker until all of the following are true:**
 - Every acceptance criterion is satisfied by code (not by comments or TODOs).
 - All quality gates pass (`test`, `lint`, `types`, `build`).
+- Code quality scan passes with 0 issues (or the provider is set to `none`).
 - The security-reviewer subagent returned no blocking findings.
 - The working tree has real changes to commit.
 
