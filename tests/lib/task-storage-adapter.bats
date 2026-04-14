@@ -81,12 +81,168 @@ EOF
   assert_equal "3" "$criteria_count"
 }
 
-@test "task_storage_fetch returns stub message for non-local providers" {
+@test "task_storage_fetch returns stub message for unimplemented providers" {
   config_init
-  config_set "task_storage.provider" "notion"
+  config_set "task_storage.provider" "jira"
   run task_storage_fetch "abc123"
   assert_equal "2" "$status"
   assert_contains "$output" "not yet implemented"
+}
+
+# -------- Notion provider tests (mocked MCP calls) --------
+
+@test "notion: task_storage_fetch returns normalized task JSON" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.ready" "Ready"
+
+  # Mock the MCP client to return a realistic Notion page response
+  notion_client_fetch_page() {
+    cat <<'MOCK'
+{
+  "id": "page-abc-123",
+  "properties": {
+    "Name": {"title": [{"plain_text": "Implement auth"}]},
+    "Status": {"status": {"name": "Ready"}}
+  },
+  "markdown": "## Description\nUsers need OAuth login.\n\n## Acceptance Criteria\n- Google OAuth works\n- Token refresh handled"
+}
+MOCK
+  }
+
+  run task_storage_fetch "page-abc-123"
+  assert_equal "0" "$status"
+  local title id ac_count st
+  title="$(echo "$output" | jq -r '.title')"
+  id="$(echo "$output" | jq -r '.id')"
+  ac_count="$(echo "$output" | jq -r '.acceptanceCriteria | length')"
+  st="$(echo "$output" | jq -r '.status')"
+  assert_equal "Implement auth" "$title"
+  assert_equal "page-abc-123" "$id"
+  assert_equal "2" "$ac_count"
+  assert_equal "ready" "$st"
+}
+
+@test "notion: task_storage_fetch maps in_progress status" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.in_progress" "In Progress"
+
+  notion_client_fetch_page() {
+    cat <<'MOCK'
+{
+  "id": "page-456",
+  "properties": {
+    "Name": {"title": [{"plain_text": "Fix bug"}]},
+    "Status": {"status": {"name": "In Progress"}}
+  },
+  "markdown": "A bug fix."
+}
+MOCK
+  }
+
+  run task_storage_fetch "page-456"
+  assert_equal "0" "$status"
+  local st
+  st="$(echo "$output" | jq -r '.status')"
+  assert_equal "in_progress" "$st"
+}
+
+@test "notion: task_storage_update_status calls MCP with correct properties" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.in_progress" "In Progress"
+
+  local captured_page_id="" captured_props=""
+  notion_client_update_page() {
+    captured_page_id="$1"
+    captured_props="$2"
+    echo '{"id": "page-789"}'
+  }
+
+  run task_storage_update_status "page-789" "in_progress"
+  assert_equal "0" "$status"
+}
+
+@test "notion: task_storage_create requires database_id config" {
+  config_init
+  config_set "task_storage.provider" "notion"
+
+  run task_storage_create "New task" "Description" "criterion1,criterion2"
+  assert_equal "1" "$status"
+  assert_contains "$output" "notion.database_id not configured"
+}
+
+@test "notion: task_storage_create calls MCP and returns page id" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.database_id" "db-test-123"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.ready" "Ready"
+
+  notion_client_create_page() {
+    echo '{"id": "new-page-id-999"}'
+  }
+
+  run task_storage_create "Setup CI" "Add GitHub Actions" "runs on push,green on main"
+  assert_equal "0" "$status"
+  assert_contains "$output" "new-page-id-999"
+}
+
+@test "notion: task_storage_list requires database_id config" {
+  config_init
+  config_set "task_storage.provider" "notion"
+
+  run task_storage_list
+  assert_equal "1" "$status"
+  assert_contains "$output" "notion.database_id not configured"
+}
+
+@test "notion: task_storage_list returns normalized JSON array" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.database_id" "db-test-123"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.ready" "Ready"
+  config_set "notion.status_values.done" "Done"
+
+  notion_client_query_database() {
+    cat <<'MOCK'
+{
+  "results": [
+    {
+      "id": "page-1",
+      "properties": {
+        "Name": {"title": [{"plain_text": "Task A"}]},
+        "Status": {"status": {"name": "Ready"}}
+      }
+    },
+    {
+      "id": "page-2",
+      "properties": {
+        "Name": {"title": [{"plain_text": "Task B"}]},
+        "Status": {"status": {"name": "Done"}}
+      }
+    }
+  ]
+}
+MOCK
+  }
+
+  run task_storage_list
+  assert_equal "0" "$status"
+  local count first_title first_status second_status
+  count="$(echo "$output" | jq 'length')"
+  first_title="$(echo "$output" | jq -r '.[0].title')"
+  first_status="$(echo "$output" | jq -r '.[0].status')"
+  second_status="$(echo "$output" | jq -r '.[1].status')"
+  assert_equal "2" "$count"
+  assert_equal "Task A" "$first_title"
+  assert_equal "ready" "$first_status"
+  assert_equal "done" "$second_status"
 }
 
 # -------- task_storage_update_status --------

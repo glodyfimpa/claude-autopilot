@@ -71,12 +71,25 @@ wizard_propose() {
   # shellcheck disable=SC2086
   options_json="$(printf '%s\n' $options_csv | jq -R . | jq -s '.')"
 
+  # Build config keys array. Notion providers require additional keys.
+  local config_keys_json
+  config_keys_json="$(jq -nc --arg k "$key" '[$k]')"
+  if [[ "$stage" == "task-storage" || "$stage" == "prd-source" ]]; then
+    config_keys_json="$(echo "$config_keys_json" | jq '. + [
+      "notion.database_id",
+      "notion.status_property",
+      "notion.status_values.ready",
+      "notion.status_values.in_progress",
+      "notion.status_values.done"
+    ]')"
+  fi
+
   jq -n \
     --arg stage "$stage" \
     --arg default "$default" \
     --argjson options "$options_json" \
-    --arg config_key "$key" \
-    '{stage: $stage, default: $default, options: $options, configKeys: [$config_key]}'
+    --argjson config_keys "$config_keys_json" \
+    '{stage: $stage, default: $default, options: $options, configKeys: $config_keys}'
 }
 
 # Propose defaults for every stage, returned as one JSON object keyed by
