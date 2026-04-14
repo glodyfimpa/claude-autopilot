@@ -8,6 +8,7 @@ labels:
   - validation
   - e2e
   - sequential
+  - v0.4.0
 dependencies:
   - TASK-1.1
   - TASK-1.2
@@ -17,16 +18,18 @@ dependencies:
   - TASK-1.6
   - TASK-1.7
   - TASK-1.8
-parent_task_id: TASK-1
+parent_task_id:
 priority: high
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Final gate for v0.3.0 release. Run the full autopilot pipeline end-to-end on a real project (Freelance Compass or RESEVO), from /autopilot-configure all the way to a merged PR. Collect friction notes for every phase and open follow-up tickets for each bug found.
+v0.4.0 validation gate. Run the full autopilot pipeline end-to-end on Freelance Compass (Node/TS with real test, lint, types, build gates), from /autopilot-configure all the way to a merged PR. Collect friction notes for every phase and open follow-up tickets for each bug found.
 
-This task is EXPLICITLY sequential: it must run after all the TASK-1.x development tasks are merged, because it validates their combined behavior against a real codebase. Cannot be parallelized with anything else.
+Note: v0.3.0 was validated on claude-autopilot itself (bash/bats), which covered the pipeline flow but not a real multi-gate stack. Freelance Compass has Next.js + TypeScript + ESLint + Jest, which exercises all four quality gates.
+
+This task is EXPLICITLY sequential: it must run after all v0.4.0 bug fixes are merged. Cannot be parallelized with anything else.
 
 The deliverable is not code but a validation report documenting: which providers were chosen, how the wizard behaved, whether the inner loop passed on the first attempt, how many iterations it took per task, how the CI watchdog behaved on a real GitHub Actions workflow, and what bugs or friction were discovered.
 <!-- SECTION:DESCRIPTION:END -->
