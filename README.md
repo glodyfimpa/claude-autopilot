@@ -144,6 +144,8 @@ The plugin enforces a single execution hierarchy: **gates before anything else**
 
 The task-complete marker is the load-bearing abstraction. It separates "this iteration is clean" from "this task is done". Without it, an automatic PR on the first clean iteration would open pull requests with half-finished features just because the tests happened to compile. The marker is written by the Claude skill only after every acceptance criterion is verified in code and a security review has passed.
 
+A task is marked done only when CI passes. After the push and PR creation, a CI watchdog (`lib/ci-watcher.sh`) polls the GitHub Actions run for the head commit until it finishes, with a configurable timeout (`pr_target.config.ci_timeout_minutes`, default 15). If CI fails, the task returns to `in_progress` and the failure log is surfaced to Claude for fixing. GitLab and Bitbucket providers are stubs that skip the check (exit 2) until implemented.
+
 Branching is never negotiable: each task starts from `main`, never from a feature branch. Parallel sprint runs use `git worktree add` for isolation and clean up on completion or cancellation.
 
 Complexity estimation favors caution: trivial batches run sequentially (parallel overhead is not worth it), complex tasks force sequential execution (they need full context), and the adaptive strategy parallelizes only when all tasks are standard and share no files with each other.
