@@ -81,13 +81,7 @@ EOF
   assert_equal "3" "$criteria_count"
 }
 
-@test "task_storage_fetch returns stub message for unimplemented providers" {
-  config_init
-  config_set "task_storage.provider" "jira"
-  run task_storage_fetch "abc123"
-  assert_equal "2" "$status"
-  assert_contains "$output" "not yet implemented"
-}
+# Stub test removed — all known task-storage providers are now implemented.
 
 # -------- Notion provider tests (mocked MCP calls) --------
 
@@ -309,4 +303,226 @@ EOF
   local count
   count="$(echo "$output" | jq 'length')"
   assert_equal "2" "$count"
+}
+
+# -------- Jira provider tests (mocked MCP calls) --------
+
+@test "jira: task_storage_fetch returns normalized task JSON" {
+  config_init
+  config_set "task_storage.provider" "jira"
+
+  # Mock the Jira client to return a realistic Jira issue response
+  jira_client_fetch_issue() {
+    cat <<'MOCK'
+{
+  "key": "PROJ-42",
+  "fields": {
+    "summary": "Implement OAuth flow",
+    "status": {"name": "To Do"},
+    "description": "Users need OAuth login.\n\n## Acceptance Criteria\n- Google OAuth works\n- Token refresh handled"
+  }
+}
+MOCK
+  }
+
+  run task_storage_fetch "PROJ-42"
+  assert_equal "0" "$status"
+  local title id ac_count st
+  title="$(echo "$output" | jq -r '.title')"
+  id="$(echo "$output" | jq -r '.id')"
+  ac_count="$(echo "$output" | jq -r '.acceptanceCriteria | length')"
+  st="$(echo "$output" | jq -r '.status')"
+  assert_equal "Implement OAuth flow" "$title"
+  assert_equal "PROJ-42" "$id"
+  assert_equal "2" "$ac_count"
+  assert_equal "ready" "$st"
+}
+
+@test "jira: task_storage_update_status calls API with correct transition" {
+  config_init
+  config_set "task_storage.provider" "jira"
+
+  local captured_issue_key="" captured_transition=""
+  jira_client_transition_issue() {
+    captured_issue_key="$1"
+    captured_transition="$2"
+    echo '{"ok": true}'
+  }
+
+  run task_storage_update_status "PROJ-42" "in_progress"
+  assert_equal "0" "$status"
+}
+
+@test "jira: task_storage_create requires project_key config" {
+  config_init
+  config_set "task_storage.provider" "jira"
+
+  run task_storage_create "New task" "Description" "criterion1,criterion2"
+  assert_equal "1" "$status"
+  assert_contains "$output" "jira.project_key not configured"
+}
+
+@test "jira: task_storage_create calls API and returns issue key" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+  config_set "jira.issue_type" "Task"
+
+  jira_client_create_issue() {
+    echo '{"key": "PROJ-99"}'
+  }
+
+  run task_storage_create "Setup CI" "Add GitHub Actions" "runs on push,green on main"
+  assert_equal "0" "$status"
+  assert_contains "$output" "PROJ-99"
+}
+
+@test "jira: task_storage_list returns normalized JSON array" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+
+  jira_client_search_issues() {
+    cat <<'MOCK'
+{
+  "issues": [
+    {
+      "key": "PROJ-1",
+      "fields": {
+        "summary": "Task A",
+        "status": {"name": "To Do"},
+        "description": ""
+      }
+    },
+    {
+      "key": "PROJ-2",
+      "fields": {
+        "summary": "Task B",
+        "status": {"name": "Done"},
+        "description": ""
+      }
+    }
+  ]
+}
+MOCK
+  }
+
+  run task_storage_list
+  assert_equal "0" "$status"
+  local count first_title first_status second_status
+  count="$(echo "$output" | jq 'length')"
+  first_title="$(echo "$output" | jq -r '.[0].title')"
+  first_status="$(echo "$output" | jq -r '.[0].status')"
+  second_status="$(echo "$output" | jq -r '.[1].status')"
+  assert_equal "2" "$count"
+  assert_equal "Task A" "$first_title"
+  assert_equal "ready" "$first_status"
+  assert_equal "done" "$second_status"
+}
+
+# -------- Linear provider tests (mocked MCP calls) --------
+
+@test "linear: task_storage_fetch returns normalized task JSON" {
+  config_init
+  config_set "task_storage.provider" "linear"
+
+  linear_client_fetch_issue() {
+    cat <<'MOCK'
+{
+  "id": "LIN-abc-123",
+  "title": "Build dashboard",
+  "description": "Create the main dashboard.\n\n## Acceptance Criteria\n- Chart renders\n- Data refreshes",
+  "state": {"name": "Todo"}
+}
+MOCK
+  }
+
+  run task_storage_fetch "LIN-abc-123"
+  assert_equal "0" "$status"
+  local title id ac_count st
+  title="$(echo "$output" | jq -r '.title')"
+  id="$(echo "$output" | jq -r '.id')"
+  ac_count="$(echo "$output" | jq -r '.acceptanceCriteria | length')"
+  st="$(echo "$output" | jq -r '.status')"
+  assert_equal "Build dashboard" "$title"
+  assert_equal "LIN-abc-123" "$id"
+  assert_equal "2" "$ac_count"
+  assert_equal "ready" "$st"
+}
+
+@test "linear: task_storage_update_status calls API with correct state" {
+  config_init
+  config_set "task_storage.provider" "linear"
+
+  local captured_issue_id="" captured_state=""
+  linear_client_update_state() {
+    captured_issue_id="$1"
+    captured_state="$2"
+    echo '{"ok": true}'
+  }
+
+  run task_storage_update_status "LIN-abc-123" "in_progress"
+  assert_equal "0" "$status"
+}
+
+@test "linear: task_storage_create requires team_id config" {
+  config_init
+  config_set "task_storage.provider" "linear"
+
+  run task_storage_create "New task" "Description" "criterion1,criterion2"
+  assert_equal "1" "$status"
+  assert_contains "$output" "linear.team_id not configured"
+}
+
+@test "linear: task_storage_create calls API and returns issue id" {
+  config_init
+  config_set "task_storage.provider" "linear"
+  config_set "linear.team_id" "team-xyz"
+
+  linear_client_create_issue() {
+    echo '{"id": "LIN-new-456"}'
+  }
+
+  run task_storage_create "Setup CI" "Add GitHub Actions" "runs on push,green on main"
+  assert_equal "0" "$status"
+  assert_contains "$output" "LIN-new-456"
+}
+
+@test "linear: task_storage_list returns normalized JSON array" {
+  config_init
+  config_set "task_storage.provider" "linear"
+  config_set "linear.team_id" "team-xyz"
+
+  linear_client_list_issues() {
+    cat <<'MOCK'
+{
+  "issues": [
+    {
+      "id": "LIN-1",
+      "title": "Task A",
+      "description": "",
+      "state": {"name": "Todo"}
+    },
+    {
+      "id": "LIN-2",
+      "title": "Task B",
+      "description": "",
+      "state": {"name": "Done"}
+    }
+  ]
+}
+MOCK
+  }
+
+  run task_storage_list
+  assert_equal "0" "$status"
+  local count first_title first_status second_status
+  count="$(echo "$output" | jq 'length')"
+  first_title="$(echo "$output" | jq -r '.[0].title')"
+  first_status="$(echo "$output" | jq -r '.[0].status')"
+  second_status="$(echo "$output" | jq -r '.[1].status')"
+  assert_equal "2" "$count"
+  assert_equal "Task A" "$first_title"
+  assert_equal "ready" "$first_status"
+  assert_equal "done" "$second_status"
 }
