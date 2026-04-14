@@ -15,7 +15,7 @@
 #     Writes the chosen provider into .autopilot-pipeline.json under the
 #     right section and returns 0, or 1 on failure.
 #
-# Known stages: prd-source, task-storage, pr-target, parallelization, code-quality, simplify.
+# Known stages: prd-source, task-storage, pr-target, parallelization, code-quality, frontend-verify, simplify.
 
 load "../helpers/test_helper"
 
@@ -127,7 +127,7 @@ EOF
   assert_equal "0" "$status"
   local keys_count
   keys_count="$(echo "$output" | jq -r '. | keys | length')"
-  assert_equal "6" "$keys_count"
+  assert_equal "7" "$keys_count"
   local pr_default
   pr_default="$(echo "$output" | jq -r '."pr-target".default')"
   assert_equal "github" "$pr_default"
@@ -183,4 +183,23 @@ EOF
   run wizard_apply "pr-target" "bogus"
   assert_equal "1" "$status"
   assert_contains "$output" "unknown"
+}
+
+# -------- frontend-verify stage --------
+
+@test "wizard_propose frontend-verify returns none as default with no MCPs" {
+  run wizard_propose "frontend-verify"
+  assert_equal "0" "$status"
+  local default
+  default="$(echo "$output" | jq -r '.default')"
+  assert_equal "none" "$default"
+}
+
+@test "wizard_apply persists frontend-verify choice" {
+  config_init
+  run wizard_apply "frontend-verify" "none"
+  assert_equal "0" "$status"
+  local stored
+  stored="$(config_get "frontend_verify.provider")"
+  assert_equal "none" "$stored"
 }

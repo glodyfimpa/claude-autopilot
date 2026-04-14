@@ -137,6 +137,22 @@ suggest_code_quality_provider() {
   echo "none"
 }
 
+# Suggest a provider for the frontend-verify stage based on active MCPs.
+# Falls back to 'none' when no MCP matches.
+suggest_frontend_verify_provider() {
+  local mcps
+  mcps="$(scan_enabled_mcps 2>/dev/null || true)"
+  if echo "$mcps" | grep -qi "chrome\|devtools"; then
+    echo "chrome-devtools"
+    return
+  fi
+  if echo "$mcps" | grep -qi "playwright"; then
+    echo "playwright"
+    return
+  fi
+  echo "none"
+}
+
 # List all known providers for a given pipeline stage. Returns non-zero for
 # unknown stages. Sources of truth live in lib/known-providers.sh.
 list_available_providers_for_stage() {
@@ -147,6 +163,7 @@ list_available_providers_for_stage() {
     prd-source)      list="$PRD_SOURCE_KNOWN_PROVIDERS" ;;
     parallelization) list="$PARALLELIZATION_KNOWN_STRATEGIES" ;;
     code-quality)    list="$CODE_QUALITY_KNOWN_PROVIDERS" ;;
+    frontend-verify) list="$FRONTEND_VERIFY_KNOWN_PROVIDERS" ;;
     simplify)        list="$KNOWN_SIMPLIFY_MODES" ;;
     *)
       echo "unknown stage: $stage" >&2

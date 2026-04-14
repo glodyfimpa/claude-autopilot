@@ -20,8 +20,9 @@ Used by `/autopilot-task` and every subagent spawned by `/autopilot-sprint`. The
 5. If the Stop hook blocks you, read the error carefully and fix the specific problem. Do not rewrite large sections hoping to "make it work".
 6. When all gates pass, run the **code quality adapter** (`lib/code-quality-adapter.sh`). The adapter dispatches to the configured provider (SonarQube, Semgrep, CodeClimate, or none) and enters a retry loop: scan, review issues, fix, re-scan, up to 5 iterations. If issues remain after 5 iterations, STOP and report the findings. Do not write the task-complete marker.
 7. **Code simplification** -- if `simplify.mode` is `auto` (check with `config_get "simplify.mode"`; treat missing/empty as `auto`), invoke the code-simplifier subagent on the changed files: *"use a code-simplifier subagent to review and simplify the changes"*. If `simplify.mode` is `manual`, skip this step (the user can run `/simplify` themselves). If `simplify.mode` is `off`, skip entirely with no message. After simplification, re-run quality gates to confirm the simplified code still passes.
-8. When code quality and simplification pass AND every acceptance criterion is satisfied, call the `security-reviewer` subagent: *"use a security-reviewer subagent to check the changes"*.
-9. When the security review has no blocking findings, write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
+8. **Frontend verification** -- if `frontend_verify.provider` is not `none` (check with `config_get "frontend_verify.provider"`), run `frontend_verify_run` from `lib/frontend-verify-adapter.sh`. The adapter dispatches to chrome-devtools or playwright and returns a pass/fail report. If verification fails, fix the issues and re-verify. If the provider is `none`, this step is silently skipped.
+9. When code quality, simplification, and frontend verification pass AND every acceptance criterion is satisfied, call the `security-reviewer` subagent: *"use a security-reviewer subagent to check the changes"*.
+10. When the security review has no blocking findings, write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
 
 ### Task-complete marker
 
@@ -38,6 +39,7 @@ When the Stop hook sees this marker, it emits a "task complete" signal instead o
 - All quality gates pass (`test`, `lint`, `types`, `build`).
 - Code quality scan passes with 0 issues (or the provider is set to `none`).
 - Code simplification passed (or `simplify.mode` is `off`/`manual`).
+- Frontend verification passed (or `frontend_verify.provider` is `none`).
 - The security-reviewer subagent returned no blocking findings.
 - The working tree has real changes to commit.
 
