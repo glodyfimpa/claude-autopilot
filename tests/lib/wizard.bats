@@ -15,7 +15,7 @@
 #     Writes the chosen provider into .autopilot-pipeline.json under the
 #     right section and returns 0, or 1 on failure.
 #
-# Known stages: prd-source, task-storage, pr-target, parallelization.
+# Known stages: prd-source, task-storage, pr-target, parallelization, code-quality, simplify.
 
 load "../helpers/test_helper"
 
@@ -127,7 +127,7 @@ EOF
   assert_equal "0" "$status"
   local keys_count
   keys_count="$(echo "$output" | jq -r '. | keys | length')"
-  assert_equal "5" "$keys_count"
+  assert_equal "6" "$keys_count"
   local pr_default
   pr_default="$(echo "$output" | jq -r '."pr-target".default')"
   assert_equal "github" "$pr_default"
