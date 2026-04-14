@@ -33,6 +33,7 @@ source "${CLAUDE_PLUGIN_ROOT}/lib/config.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/branch-utils.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/task-storage-adapter.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/pr-adapter.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/ci-watcher.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/complexity-estimator.sh"
 ```
 
@@ -97,6 +98,18 @@ Build the PR body with:
 - A link back to the task ref when the storage supports it
 
 Call `pr_adapter_create "$branch" "$title" "$body" "$base"` and capture the returned PR URL.
+
+### Step 8.5: Wait for CI
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/lib/ci-watcher.sh"
+```
+
+Call `wait_for_ci "$head_ref"` where `$head_ref` is the commit SHA that was pushed. The function reads `pr_target.config.ci_timeout_minutes` from the config (default 15 minutes).
+
+- **Exit 0**: CI passed. Proceed to marking the task done.
+- **Exit 2**: Provider is a stub (gitlab/bitbucket). Proceed without blocking.
+- **Exit 1**: CI failed. Roll the task status back to `in_progress` by calling `task_storage_update_status "$ARGUMENTS" "in_progress"`. Surface the failure log to the user and stop. Do NOT mark the task as done.
 
 ### Step 9: Mark the task as done
 
