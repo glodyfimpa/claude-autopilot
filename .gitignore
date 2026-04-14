@@ -5,7 +5,6 @@
 .claude/memory/
 .claude/worktrees/
 .claude/todos/
-CLAUDE.md
 
 # Autopilot state generated when the plugin is run from inside its own repo.
 # /tasks/ is anchored to the root so it does NOT match backlog/tasks/ which
