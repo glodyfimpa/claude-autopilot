@@ -28,6 +28,18 @@ Tasks in `backlog/tasks/`, format: `task-ID - Title-slug.md`
 YAML frontmatter with status: "To Do" | "In Progress" | "Done"
 Backlog must be on main for the backlog provider to work across branches.
 
+## PRs
+- NEVER merge PRs. Only create them. The user reviews and merges manually.
+- After creating PRs, update body with test plan results before handing off.
+
 ## Worktrees
 Subagent worktrees can leak files into the main directory.
 After parallel runs: `git checkout -- . && git clean -fd <leaked-dirs> && git worktree prune`
+- Always `cd` to worktree path before any git operation (checkout, add, commit)
+- `git branch -D` fails if branch is checked out in a worktree — remove worktree first
+- Subagents cannot run `gh pr create` — always create PRs from the main session
+
+## Release
+- Update test count in README.md on each release (search "Current state:")
+- Bump version in `.claude-plugin/plugin.json`
+- Tag format: `git tag -a vX.Y.Z -m "changelog"`
