@@ -114,6 +114,7 @@ Supported pipeline providers (any tool with an MCP server can be added later):
 | Task storage | local-file, chat-paste, notion, jira, linear, backlog | |
 | PR target | github, gitlab, bitbucket | |
 | Code quality | none (opt-out) | sonarqube, semgrep, codeclimate |
+| Frontend verify | none (opt-out) | chrome-devtools, playwright |
 
 ## Commands
 
@@ -189,6 +190,8 @@ claude-autopilot/                                    the plugin
 │   ├── task-storage-providers/                      local-file, chat-paste, notion, jira, linear, backlog
 │   ├── code-quality-adapter.sh                       code quality dispatcher + retry loop
 │   ├── code-quality-providers/                       sonarqube, semgrep, codeclimate, none
+│   ├── frontend-verify-adapter.sh                    frontend verification dispatcher
+│   ├── frontend-verify-providers/                    chrome-devtools, playwright, none
 │   ├── pr-adapter.sh                                PR target dispatcher
 │   └── pr-providers/                                github, gitlab, bitbucket
 ├── tests/
