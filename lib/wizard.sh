@@ -71,7 +71,7 @@ wizard_propose() {
   # shellcheck disable=SC2086
   options_json="$(printf '%s\n' $options_csv | jq -R . | jq -s '.')"
 
-  # Build config keys array. Notion providers require additional keys.
+  # Build config keys array. Some providers require additional keys.
   local config_keys_json
   config_keys_json="$(jq -nc --arg k "$key" '[$k]')"
   if [[ "$stage" == "task-storage" || "$stage" == "prd-source" ]]; then
@@ -81,6 +81,19 @@ wizard_propose() {
       "notion.status_values.ready",
       "notion.status_values.in_progress",
       "notion.status_values.done"
+    ]')"
+  fi
+  if [[ "$stage" == "task-storage" ]]; then
+    config_keys_json="$(echo "$config_keys_json" | jq '. + [
+      "jira.project_key",
+      "jira.issue_type",
+      "jira.status_values.ready",
+      "jira.status_values.in_progress",
+      "jira.status_values.done",
+      "linear.team_id",
+      "linear.status_values.ready",
+      "linear.status_values.in_progress",
+      "linear.status_values.done"
     ]')"
   fi
 
