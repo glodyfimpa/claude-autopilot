@@ -112,7 +112,7 @@ Supported pipeline providers (any tool with an MCP server can be added later):
 |-------|-------------|-----------------|
 | PRD source | local-file, chat-paste, notion | jira, google-drive |
 | Task storage | local-file, chat-paste, notion | jira, linear, backlog |
-| PR target | github, gitlab, bitbucket | |
+| PR target | github | gitlab, bitbucket |
 | Code quality | none (opt-out) | sonarqube, semgrep, codeclimate |
 
 ## Commands
