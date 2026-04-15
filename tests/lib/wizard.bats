@@ -338,3 +338,40 @@ REAL
     return 1
   fi
 }
+
+# -------- auto-discovery integration --------
+
+@test "wizard_apply accepts a provider that exists only as a file (not in known-providers.sh)" {
+  # Create a mock providers dir with an extra provider not in static list
+  mkdir -p "$TEST_TMPDIR/mock-lib/code-quality-providers"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/sonarqube.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/semgrep.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/codeclimate.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/none.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/custom-linter.sh"
+
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  config_init
+  run wizard_apply "code-quality" "custom-linter"
+  assert_equal "0" "$status"
+  local stored
+  stored="$(config_get "code_quality.provider")"
+  assert_equal "custom-linter" "$stored"
+}
+
+@test "wizard_propose includes auto-discovered providers in options" {
+  mkdir -p "$TEST_TMPDIR/mock-lib/frontend-verify-providers"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/frontend-verify-providers/chrome-devtools.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/frontend-verify-providers/playwright.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/frontend-verify-providers/none.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/frontend-verify-providers/cypress.sh"
+
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  run wizard_propose "frontend-verify"
+  assert_equal "0" "$status"
+  local has_cypress
+  has_cypress="$(echo "$output" | jq -r '.options | map(select(. == "cypress")) | length')"
+  assert_equal "1" "$has_cypress"
+}

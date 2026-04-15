@@ -191,3 +191,152 @@ EOF
   run list_available_providers_for_stage "nonsense"
   assert_equal "1" "$status"
 }
+
+# -------- _stage_to_providers_dir --------
+
+@test "_stage_to_providers_dir maps pr-target to pr-providers" {
+  run _stage_to_providers_dir "pr-target"
+  assert_equal "0" "$status"
+  assert_equal "pr-providers" "$output"
+}
+
+@test "_stage_to_providers_dir maps task-storage to task-storage-providers" {
+  run _stage_to_providers_dir "task-storage"
+  assert_equal "0" "$status"
+  assert_equal "task-storage-providers" "$output"
+}
+
+@test "_stage_to_providers_dir maps prd-source to prd-source-providers" {
+  run _stage_to_providers_dir "prd-source"
+  assert_equal "0" "$status"
+  assert_equal "prd-source-providers" "$output"
+}
+
+@test "_stage_to_providers_dir maps code-quality to code-quality-providers" {
+  run _stage_to_providers_dir "code-quality"
+  assert_equal "0" "$status"
+  assert_equal "code-quality-providers" "$output"
+}
+
+@test "_stage_to_providers_dir maps frontend-verify to frontend-verify-providers" {
+  run _stage_to_providers_dir "frontend-verify"
+  assert_equal "0" "$status"
+  assert_equal "frontend-verify-providers" "$output"
+}
+
+@test "_stage_to_providers_dir returns 1 for unknown stage" {
+  run _stage_to_providers_dir "nonsense"
+  assert_equal "1" "$status"
+}
+
+@test "_stage_to_providers_dir returns 1 for non-provider stages" {
+  run _stage_to_providers_dir "parallelization"
+  assert_equal "1" "$status"
+  run _stage_to_providers_dir "simplify"
+  assert_equal "1" "$status"
+}
+
+# -------- discover_providers_for_stage --------
+
+@test "discover_providers_for_stage finds providers from directory" {
+  mkdir -p "$TEST_TMPDIR/mock-lib/task-storage-providers"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/task-storage-providers/local-file.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/task-storage-providers/notion.sh"
+
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  run discover_providers_for_stage "task-storage"
+  assert_equal "0" "$status"
+  assert_contains "$output" "local-file"
+  assert_contains "$output" "notion"
+}
+
+@test "discover_providers_for_stage returns sorted provider names" {
+  mkdir -p "$TEST_TMPDIR/mock-lib/pr-providers"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/pr-providers/github.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/pr-providers/bitbucket.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/pr-providers/gitlab.sh"
+
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  run discover_providers_for_stage "pr-target"
+  assert_equal "0" "$status"
+  assert_contains "$output" "github"
+  assert_contains "$output" "bitbucket"
+  assert_contains "$output" "gitlab"
+}
+
+@test "discover_providers_for_stage returns 1 for unknown stage" {
+  run discover_providers_for_stage "nonsense"
+  assert_equal "1" "$status"
+}
+
+@test "discover_providers_for_stage returns 1 when directory does not exist" {
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  run discover_providers_for_stage "task-storage"
+  assert_equal "1" "$status"
+}
+
+@test "discover_providers_for_stage ignores non-.sh files" {
+  mkdir -p "$TEST_TMPDIR/mock-lib/prd-source-providers"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/prd-source-providers/local-file.sh"
+  echo 'readme' > "$TEST_TMPDIR/mock-lib/prd-source-providers/README.md"
+  echo 'data' > "$TEST_TMPDIR/mock-lib/prd-source-providers/config.json"
+
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  run discover_providers_for_stage "prd-source"
+  assert_equal "0" "$status"
+  assert_equal "local-file" "$output"
+}
+
+@test "adding a new provider file makes it immediately discoverable" {
+  mkdir -p "$TEST_TMPDIR/mock-lib/task-storage-providers"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/task-storage-providers/local-file.sh"
+
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  run discover_providers_for_stage "task-storage"
+  assert_equal "local-file" "$output"
+
+  # Add a new provider file — no edits to mcp-detector.sh or known-providers.sh
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/task-storage-providers/new-provider.sh"
+
+  run discover_providers_for_stage "task-storage"
+  assert_contains "$output" "local-file"
+  assert_contains "$output" "new-provider"
+}
+
+# -------- list_available_providers_for_stage with auto-discovery --------
+
+@test "list_available_providers_for_stage uses discovery from provider directory" {
+  mkdir -p "$TEST_TMPDIR/mock-lib/code-quality-providers"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/sonarqube.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/semgrep.sh"
+  echo '#!/bin/bash' > "$TEST_TMPDIR/mock-lib/code-quality-providers/none.sh"
+
+  MCP_DETECTOR_SELF_DIR="$TEST_TMPDIR/mock-lib"
+
+  run list_available_providers_for_stage "code-quality"
+  assert_equal "0" "$status"
+  assert_contains "$output" "sonarqube"
+  assert_contains "$output" "semgrep"
+  assert_contains "$output" "none"
+}
+
+@test "list_available_providers_for_stage still works for parallelization (no provider dir)" {
+  run list_available_providers_for_stage "parallelization"
+  assert_equal "0" "$status"
+  assert_contains "$output" "adaptive"
+  assert_contains "$output" "always-sequential"
+  assert_contains "$output" "always-parallel"
+}
+
+@test "list_available_providers_for_stage still works for simplify (no provider dir)" {
+  run list_available_providers_for_stage "simplify"
+  assert_equal "0" "$status"
+  assert_contains "$output" "auto"
+  assert_contains "$output" "manual"
+  assert_contains "$output" "off"
+}
