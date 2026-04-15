@@ -10,6 +10,8 @@
 #
 # Depends on lib/config.sh, lib/mcp-detector.sh, lib/known-providers.sh.
 
+WIZARD_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 WIZARD_KNOWN_STAGES="prd-source task-storage pr-target parallelization code-quality frontend-verify simplify"
 
 _wizard_stage_config_key() {
@@ -31,6 +33,31 @@ _wizard_is_valid_stage() {
     [[ "$s" == "$1" ]] && return 0
   done
   return 1
+}
+
+# Map a stage name to its providers directory basename.
+# Returns empty string (and 1) for stages without provider files.
+_wizard_stage_providers_dir() {
+  case "$1" in
+    pr-target)       echo "pr-providers" ;;
+    task-storage)    echo "task-storage-providers" ;;
+    prd-source)      echo "prd-source-providers" ;;
+    code-quality)    echo "code-quality-providers" ;;
+    frontend-verify) echo "frontend-verify-providers" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Check whether a provider is a stub (not yet implemented).
+# A stub file contains "return 2" as a marker.
+# Returns 0 if stub, 1 if real or if the stage has no provider files.
+_wizard_is_stub_provider() {
+  local stage="$1" provider="$2"
+  local providers_dir
+  providers_dir="$(_wizard_stage_providers_dir "$stage")" || return 1
+  local provider_file="$WIZARD_SELF_DIR/${providers_dir}/${provider}.sh"
+  [[ -f "$provider_file" ]] || return 1
+  grep -q 'return 2' "$provider_file"
 }
 
 # Compute the recommended default for a provider-backed stage using the
@@ -78,6 +105,15 @@ wizard_propose() {
   # shellcheck disable=SC2086
   options_json="$(printf '%s\n' $options_csv | jq -R . | jq -s '.')"
 
+  # Detect which options are stubs (not yet implemented).
+  local stubs_json="[]"
+  local opt
+  for opt in $options_csv; do
+    if _wizard_is_stub_provider "$stage" "$opt"; then
+      stubs_json="$(echo "$stubs_json" | jq --arg s "$opt" '. + [$s]')"
+    fi
+  done
+
   # Build config keys array. Some providers require additional keys.
   local config_keys_json
   config_keys_json="$(jq -nc --arg k "$key" '[$k]')"
@@ -108,8 +144,9 @@ wizard_propose() {
     --arg stage "$stage" \
     --arg default "$default" \
     --argjson options "$options_json" \
+    --argjson stubs "$stubs_json" \
     --argjson config_keys "$config_keys_json" \
-    '{stage: $stage, default: $default, options: $options, configKeys: $config_keys}'
+    '{stage: $stage, default: $default, options: $options, stubs: $stubs, configKeys: $config_keys}'
 }
 
 # Propose defaults for every stage, returned as one JSON object keyed by
@@ -153,4 +190,9 @@ wizard_apply() {
   local key
   key="$(_wizard_stage_config_key "$stage")"
   config_set "$key" "$choice"
+
+  # Warn if the chosen provider is a stub (not yet implemented).
+  if _wizard_is_stub_provider "$stage" "$choice"; then
+    echo "Warning: '$choice' is a stub provider for $stage (not yet implemented). It will return exit code 2 at runtime." >&2
+  fi
 }

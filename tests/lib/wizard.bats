@@ -203,3 +203,138 @@ EOF
   stored="$(config_get "frontend_verify.provider")"
   assert_equal "none" "$stored"
 }
+
+# -------- stub provider detection --------
+
+@test "_wizard_is_stub_provider detects a stub provider file" {
+  # Create a fake providers directory with a stub file
+  mkdir -p "$TEST_TMPDIR/lib/code-quality-providers"
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/fakestub.sh" <<'STUB'
+#!/usr/bin/env bash
+fake_scan() {
+  echo "not yet implemented" >&2
+  return 2
+}
+STUB
+  # Override WIZARD_SELF_DIR to point to our fake lib/
+  WIZARD_SELF_DIR="$TEST_TMPDIR/lib"
+  run _wizard_is_stub_provider "code-quality" "fakestub"
+  assert_equal "0" "$status"
+}
+
+@test "_wizard_is_stub_provider returns 1 for a real (non-stub) provider" {
+  # Create a fake providers directory with a real provider file
+  mkdir -p "$TEST_TMPDIR/lib/code-quality-providers"
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/real.sh" <<'REAL'
+#!/usr/bin/env bash
+real_scan() {
+  echo '{"issues":[]}'
+  return 0
+}
+REAL
+  WIZARD_SELF_DIR="$TEST_TMPDIR/lib"
+  run _wizard_is_stub_provider "code-quality" "real"
+  assert_equal "1" "$status"
+}
+
+@test "_wizard_is_stub_provider returns 1 for non-provider stages" {
+  # parallelization and simplify have no provider files
+  run _wizard_is_stub_provider "parallelization" "adaptive"
+  assert_equal "1" "$status"
+}
+
+@test "wizard_propose includes stubs array marking stub providers" {
+  # Create fake provider dirs with one stub and one real
+  mkdir -p "$TEST_TMPDIR/lib/code-quality-providers"
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/sonarqube.sh" <<'REAL'
+#!/usr/bin/env bash
+code_quality_sonarqube_scan() { return 0; }
+REAL
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/semgrep.sh" <<'STUB'
+#!/usr/bin/env bash
+code_quality_semgrep_scan() { return 2; }
+STUB
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/codeclimate.sh" <<'STUB'
+#!/usr/bin/env bash
+code_quality_codeclimate_scan() { return 2; }
+STUB
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/none.sh" <<'REAL'
+#!/usr/bin/env bash
+code_quality_none_scan() { return 0; }
+REAL
+  WIZARD_SELF_DIR="$TEST_TMPDIR/lib"
+  run wizard_propose "code-quality"
+  assert_equal "0" "$status"
+  # The stubs array should contain semgrep and codeclimate
+  local stubs_len
+  stubs_len="$(echo "$output" | jq -r '.stubs | length')"
+  assert_equal "2" "$stubs_len"
+  # sonarqube should NOT be in stubs
+  local has_sonarqube
+  has_sonarqube="$(echo "$output" | jq -r '.stubs | index("sonarqube") // "null"')"
+  assert_equal "null" "$has_sonarqube"
+  # semgrep SHOULD be in stubs
+  local has_semgrep
+  has_semgrep="$(echo "$output" | jq -r '.stubs | index("semgrep") // "null"')"
+  [[ "$has_semgrep" != "null" ]]
+}
+
+@test "wizard_propose stubs array is empty when no stubs exist" {
+  # Create fake provider dirs with all real providers
+  mkdir -p "$TEST_TMPDIR/lib/pr-providers"
+  cat > "$TEST_TMPDIR/lib/pr-providers/github.sh" <<'REAL'
+#!/usr/bin/env bash
+pr_github_submit() { return 0; }
+REAL
+  cat > "$TEST_TMPDIR/lib/pr-providers/gitlab.sh" <<'REAL'
+#!/usr/bin/env bash
+pr_gitlab_submit() { return 0; }
+REAL
+  cat > "$TEST_TMPDIR/lib/pr-providers/bitbucket.sh" <<'REAL'
+#!/usr/bin/env bash
+pr_bitbucket_submit() { return 0; }
+REAL
+  WIZARD_SELF_DIR="$TEST_TMPDIR/lib"
+  make_fake_git_repo "https://github.com/acme/sample.git"
+  run wizard_propose "pr-target"
+  assert_equal "0" "$status"
+  local stubs_len
+  stubs_len="$(echo "$output" | jq -r '.stubs | length')"
+  assert_equal "0" "$stubs_len"
+}
+
+@test "wizard_apply emits stub warning to stderr when selecting a stub provider" {
+  config_init
+  # Create a fake stub provider
+  mkdir -p "$TEST_TMPDIR/lib/code-quality-providers"
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/semgrep.sh" <<'STUB'
+#!/usr/bin/env bash
+code_quality_semgrep_scan() { return 2; }
+STUB
+  WIZARD_SELF_DIR="$TEST_TMPDIR/lib"
+  run wizard_apply "code-quality" "semgrep"
+  assert_equal "0" "$status"
+  assert_contains "$output" "stub"
+  # Config should still be written
+  local stored
+  stored="$(config_get "code_quality.provider")"
+  assert_equal "semgrep" "$stored"
+}
+
+@test "wizard_apply does not emit stub warning for a real provider" {
+  config_init
+  # Create a real provider
+  mkdir -p "$TEST_TMPDIR/lib/code-quality-providers"
+  cat > "$TEST_TMPDIR/lib/code-quality-providers/sonarqube.sh" <<'REAL'
+#!/usr/bin/env bash
+code_quality_sonarqube_scan() { return 0; }
+REAL
+  WIZARD_SELF_DIR="$TEST_TMPDIR/lib"
+  run wizard_apply "code-quality" "sonarqube"
+  assert_equal "0" "$status"
+  # Output should NOT contain "stub"
+  if [[ "$output" == *"stub"* ]]; then
+    echo "expected no stub warning, but got: $output"
+    return 1
+  fi
+}
