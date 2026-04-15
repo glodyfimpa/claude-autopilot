@@ -19,9 +19,10 @@ Bash scripts, bats tests, no Node/Python runtime.
 - NO `git worktree remove` (git 2.15) → `rm -rf <path> && git worktree prune`
 
 ## Adapter Pattern
-New adapters follow: `lib/<name>-adapter.sh` + `lib/<name>-providers/*.sh`
-+ entry in `lib/known-providers.sh` + stage in `lib/wizard.sh`
-+ `tests/lib/<name>-adapter.bats`. See `lib/task-storage-adapter.sh` as reference.
+New providers: create `lib/<name>-providers/<provider>.sh` + test in `tests/lib/<name>-adapter.bats`.
+Auto-discovery scans `lib/*-providers/` directories — no edits to known-providers.sh or wizard.sh needed.
+`lib/known-providers.sh` remains as fallback for stages without provider dirs (parallelization, simplify).
+See `lib/task-storage-adapter.sh` as reference adapter.
 
 ## Backlog
 Tasks in `backlog/tasks/`, format: `task-ID - Title-slug.md`
@@ -30,7 +31,8 @@ Backlog must be on main for the backlog provider to work across branches.
 
 ## PRs
 - NEVER merge PRs. Only create them. The user reviews and merges manually.
-- After creating PRs, update body with test plan results before handing off.
+- Execute ALL test plan items (including manual smoke tests) before declaring PR ready.
+- Every checklist item in the PR body must be checked before handoff — no unchecked items.
 
 ## Worktrees
 Subagent worktrees can leak files into the main directory.
@@ -38,8 +40,12 @@ After parallel runs: `git checkout -- . && git clean -fd <leaked-dirs> && git wo
 - Always `cd` to worktree path before any git operation (checkout, add, commit)
 - `git branch -D` fails if branch is checked out in a worktree — remove worktree first
 - Subagents cannot run `gh pr create` — always create PRs from the main session
+- When parallel tasks touch shared files, bundle into 1 PR via cherry-pick integration:
+  create integration branch from main → cherry-pick each worktree commit sequentially →
+  resolve conflicts → run full test suite → open single PR
 
 ## Release
 - Update test count in README.md on each release (search "Current state:")
+- Provider matrix in README is auto-generated: run `scripts/generate-readme-matrix.sh` and verify match
 - Bump version in `.claude-plugin/plugin.json`
 - Tag format: `git tag -a vX.Y.Z -m "changelog"`
