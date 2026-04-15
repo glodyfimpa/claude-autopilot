@@ -14,6 +14,48 @@ MCP_DETECTOR_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$MCP_DETECTOR_SELF_DIR/known-providers.sh"
 
+# ---------------------------------------------------------------------------
+# Auto-discovery: derive provider lists from files in lib/*-providers/ dirs.
+# ---------------------------------------------------------------------------
+
+# Map a wizard stage name to its providers directory name.
+# Returns 1 for stages that don't have a providers directory (e.g. parallelization, simplify).
+_stage_to_providers_dir() {
+  case "$1" in
+    pr-target)       echo "pr-providers" ;;
+    task-storage)    echo "task-storage-providers" ;;
+    prd-source)      echo "prd-source-providers" ;;
+    code-quality)    echo "code-quality-providers" ;;
+    frontend-verify) echo "frontend-verify-providers" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Discover providers by scanning the providers directory for .sh files.
+# Prints one provider name per line (filenames without .sh extension).
+# Returns 1 if the stage has no providers directory or the directory is missing.
+discover_providers_for_stage() {
+  local stage="$1"
+  local dir_name
+  dir_name="$(_stage_to_providers_dir "$stage")" || return 1
+  local providers_dir="$MCP_DETECTOR_SELF_DIR/$dir_name"
+  if [[ ! -d "$providers_dir" ]]; then
+    return 1
+  fi
+  local result=""
+  local f
+  for f in "$providers_dir"/*.sh; do
+    [[ -f "$f" ]] || continue
+    local name
+    name="$(basename "$f" .sh)"
+    result="${result:+$result }$name"
+  done
+  if [[ -z "$result" ]]; then
+    return 1
+  fi
+  echo "$result"
+}
+
 # Detect the git hosting provider from the 'origin' remote URL.
 # Prints one of: github, gitlab, bitbucket, unknown, none
 detect_git_host() {
@@ -154,16 +196,28 @@ suggest_frontend_verify_provider() {
 }
 
 # List all known providers for a given pipeline stage. Returns non-zero for
-# unknown stages. Sources of truth live in lib/known-providers.sh.
+# unknown stages.
+#
+# Provider-backed stages (pr-target, task-storage, prd-source, code-quality,
+# frontend-verify) use auto-discovery: the providers directory is scanned for
+# .sh files. Non-provider stages (parallelization, simplify) fall back to the
+# static constants in lib/known-providers.sh.
 list_available_providers_for_stage() {
-  local stage="$1" list
+  local stage="$1"
+
+  # Try auto-discovery first (works for stages with a providers directory)
+  local discovered
+  discovered="$(discover_providers_for_stage "$stage" 2>/dev/null)"
+  if [[ -n "$discovered" ]]; then
+    # shellcheck disable=SC2086
+    printf '%s\n' $discovered
+    return 0
+  fi
+
+  # Fall back to static lists for non-provider stages
+  local list
   case "$stage" in
-    pr-target)       list="$PR_ADAPTER_KNOWN_PROVIDERS" ;;
-    task-storage)    list="$TASK_STORAGE_KNOWN_PROVIDERS" ;;
-    prd-source)      list="$PRD_SOURCE_KNOWN_PROVIDERS" ;;
     parallelization) list="$PARALLELIZATION_KNOWN_STRATEGIES" ;;
-    code-quality)    list="$CODE_QUALITY_KNOWN_PROVIDERS" ;;
-    frontend-verify) list="$FRONTEND_VERIFY_KNOWN_PROVIDERS" ;;
     simplify)        list="$KNOWN_SIMPLIFY_MODES" ;;
     *)
       echo "unknown stage: $stage" >&2

@@ -37,9 +37,13 @@ source "${CLAUDE_PLUGIN_ROOT}/lib/ci-watcher.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/complexity-estimator.sh"
 ```
 
-### Step 2: Fetch the task
+### Step 2: Fetch the task (pre-flight check)
 
-Run `task_storage_fetch "$ARGUMENTS"` and parse the JSON. Fail fast with a clear message if the provider returns exit 2 (stub) or 1 (missing ref).
+Run `task_storage_fetch "$ARGUMENTS"` and capture the exit code. This MUST succeed before any branch is created.
+
+- **Exit 0**: Parse the JSON and proceed to Step 3.
+- **Exit 1**: The task ref was not found. Print: `Pre-flight failed: task ref '<ref>' not found in task storage. Verify the ref exists and the task_storage.provider is correctly configured (current: <provider>).` STOP here — do NOT create any branch or proceed further.
+- **Exit 2**: The provider is a stub (not implemented). Print: `Pre-flight failed: task storage provider '<provider>' is a stub and cannot fetch tasks. Configure an implemented provider with /autopilot-configure task-storage.` STOP here.
 
 ### Step 3: Estimate complexity
 
@@ -63,6 +67,12 @@ create_branch_from_main "$branch"
 ### Step 5: Mark the task as in-progress
 
 Call `task_storage_update_status "$ARGUMENTS" "in_progress"`. Ignore exit code 2 (provider doesn't support status updates).
+
+Also write the active task state file so the SessionStart hook can inject context:
+
+```bash
+echo "{\"active_task\": \"$ARGUMENTS\"}" > "$HOME/.claude/.autopilot-active-task.json"
+```
 
 ### Step 6: Implement + verify loop
 
@@ -115,8 +125,15 @@ Call `wait_for_ci "$head_ref"` where `$head_ref` is the commit SHA that was push
 
 Call `task_storage_update_status "$ARGUMENTS" "done"`. Print the PR URL to the user.
 
+Clean up the active task state file:
+
+```bash
+rm -f "$HOME/.claude/.autopilot-active-task.json"
+```
+
 ## Error handling
 
 - If any gate fails after max iterations, stop BEFORE committing/pushing and surface the failure to the user. Leave the branch local so they can inspect.
 - If `gh` (GitHub CLI) is missing and the provider is `github`, tell the user to install it.
 - If the provider is a stub, the command should have failed at Step 2 already.
+- On any error that stops execution (gate failures after max iterations, missing tools), also clean up the active task state file: `rm -f "$HOME/.claude/.autopilot-active-task.json"`

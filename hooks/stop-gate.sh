@@ -50,7 +50,7 @@ STACK_JSON=$(bash "$SCRIPT_DIR/detect-stack.sh")
 STACK=$(echo "$STACK_JSON" | jq -r '.stack')
 
 if [[ "$STACK" == "unknown" ]]; then
-  # Unrecognized stack: pass without gates
+  echo '{"decision":"approve","systemMessage":"AUTOPILOT WARNING: No quality gates detected (stack: unknown). Tests, lint, type checks, and builds are NOT being verified. To fix: run the detect-stack hook to verify your project stack, or configure a supported stack (node-ts, java-maven, python, rust, go)."}'
   exit 0
 fi
 
