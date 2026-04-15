@@ -108,13 +108,15 @@ Runtime requirements:
 
 Supported pipeline providers (any tool with an MCP server can be added later):
 
+<!-- PROVIDER-MATRIX:BEGIN -->
 | Stage | Implemented | Stubs available |
 |-------|-------------|-----------------|
 | PRD source | local-file, chat-paste, notion | jira, google-drive |
-| Task storage | local-file, chat-paste, notion, jira, linear, backlog | |
-| PR target | github, gitlab, bitbucket | |
-| Code quality | none (opt-out) | sonarqube, semgrep, codeclimate |
-| Frontend verify | none (opt-out) | chrome-devtools, playwright |
+| Task storage | local-file, chat-paste, notion, jira, linear, backlog |  |
+| PR target | github, gitlab, bitbucket |  |
+| Code quality | sonarqube, none | semgrep, codeclimate |
+| Frontend verify | none | chrome-devtools, playwright |
+<!-- PROVIDER-MATRIX:END -->
 
 ## Commands
 
