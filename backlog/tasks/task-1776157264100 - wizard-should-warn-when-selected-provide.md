@@ -1,7 +1,7 @@
 ---
 id: TASK-1776157264100
 title: Wizard should warn when selected provider is a stub
-status: To Do
+status: Done
 priority: medium
 ---
 

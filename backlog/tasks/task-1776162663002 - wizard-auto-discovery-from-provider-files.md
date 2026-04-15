@@ -1,7 +1,7 @@
 ---
 id: task-1776162663002
 title: Wizard auto-discovery from provider files instead of manual registration
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-14 16:31'
 labels:

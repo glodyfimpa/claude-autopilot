@@ -1,7 +1,7 @@
 ---
 id: TASK-1776159717849
 title: autopilot-task should manage active task state file
-status: To Do
+status: Done
 priority: medium
 ---
 

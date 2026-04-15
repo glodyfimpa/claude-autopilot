@@ -1,7 +1,7 @@
 ---
 id: task-1776162663001
 title: Auto-generate README provider matrix from known-providers.sh
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-14 16:31'
 labels:

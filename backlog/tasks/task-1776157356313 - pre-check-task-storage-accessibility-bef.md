@@ -1,7 +1,7 @@
 ---
 id: TASK-1776157356313
 title: Pre-check task storage accessibility before branch creation
-status: To Do
+status: Done
 priority: medium
 ---
 

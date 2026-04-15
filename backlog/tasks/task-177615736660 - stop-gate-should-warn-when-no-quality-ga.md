@@ -1,7 +1,7 @@
 ---
 id: TASK-177615736660
 title: Stop-gate should warn when no quality gates are configured
-status: To Do
+status: Done
 priority: medium
 ---
 
