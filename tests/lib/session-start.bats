@@ -111,6 +111,48 @@ _clear_active_task() {
   assert_file_exists "sprint-context.md"
 }
 
+# -------- Active task file lifecycle (contract with autopilot-task command) --------
+
+@test "active task JSON written by autopilot-task command is readable by session-start" {
+  # Simulate what autopilot-task step 5 writes
+  local task_ref="TASK-1.3"
+  mkdir -p "$HOME/.claude"
+  echo "{\"active_task\": \"$task_ref\"}" > "$HOME/.claude/.autopilot-active-task.json"
+
+  bash "$PLUGIN_ROOT/hooks/session-start.sh"
+  grep -q "TASK-1.3" sprint-context.md
+}
+
+@test "active task JSON uses the key that session-start expects" {
+  # session-start reads .active_task via jq — verify the field name matters
+  mkdir -p "$HOME/.claude"
+  echo '{"active_task": "TASK-1.3"}' > "$HOME/.claude/.autopilot-active-task.json"
+
+  local ref
+  ref="$(jq -r '.active_task // ""' "$HOME/.claude/.autopilot-active-task.json")"
+  assert_equal "TASK-1.3" "$ref"
+}
+
+@test "removing active task file causes session-start to fall back to minimal context" {
+  # Simulate step 5: write the file
+  _set_active_task "TASK-1.3"
+  bash "$PLUGIN_ROOT/hooks/session-start.sh"
+  grep -q "TASK-1.3" sprint-context.md
+
+  # Simulate step 9: remove the file
+  _clear_active_task
+  bash "$PLUGIN_ROOT/hooks/session-start.sh"
+  ! grep -q "TASK-1.3" sprint-context.md
+  ! grep -q "Acceptance Criteria" sprint-context.md
+}
+
+@test "active task file with empty ref produces minimal context" {
+  mkdir -p "$HOME/.claude"
+  echo '{"active_task": ""}' > "$HOME/.claude/.autopilot-active-task.json"
+  bash "$PLUGIN_ROOT/hooks/session-start.sh"
+  ! grep -q "Current Task" sprint-context.md
+}
+
 # -------- Overwrite behavior --------
 
 @test "session-start overwrites existing sprint-context.md" {

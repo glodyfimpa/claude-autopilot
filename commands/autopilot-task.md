@@ -64,6 +64,12 @@ create_branch_from_main "$branch"
 
 Call `task_storage_update_status "$ARGUMENTS" "in_progress"`. Ignore exit code 2 (provider doesn't support status updates).
 
+Also write the active task state file so the SessionStart hook can inject context:
+
+```bash
+echo "{\"active_task\": \"$ARGUMENTS\"}" > "$HOME/.claude/.autopilot-active-task.json"
+```
+
 ### Step 6: Implement + verify loop
 
 Invoke the autopilot skill (from `skills/autopilot/SKILL.md`) with the task description and acceptance criteria as the initial context. The skill is responsible for:
@@ -115,8 +121,15 @@ Call `wait_for_ci "$head_ref"` where `$head_ref` is the commit SHA that was push
 
 Call `task_storage_update_status "$ARGUMENTS" "done"`. Print the PR URL to the user.
 
+Clean up the active task state file:
+
+```bash
+rm -f "$HOME/.claude/.autopilot-active-task.json"
+```
+
 ## Error handling
 
 - If any gate fails after max iterations, stop BEFORE committing/pushing and surface the failure to the user. Leave the branch local so they can inspect.
 - If `gh` (GitHub CLI) is missing and the provider is `github`, tell the user to install it.
 - If the provider is a stub, the command should have failed at Step 2 already.
+- On any error that stops execution (gate failures after max iterations, missing tools), also clean up the active task state file: `rm -f "$HOME/.claude/.autopilot-active-task.json"`
