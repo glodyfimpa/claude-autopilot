@@ -83,6 +83,38 @@ EOF
 
 # Stub test removed — all known task-storage providers are now implemented.
 
+# -------- Pre-flight: fetch fails gracefully for missing refs --------
+
+@test "task_storage_fetch returns exit 1 with error message for missing local-file ref" {
+  config_init
+  config_set "task_storage.provider" "local-file"
+  # Do NOT create the file — it must not exist
+  run task_storage_fetch "tasks/nonexistent-task.md"
+  assert_equal "1" "$status"
+  assert_contains "$output" "task file not found"
+  assert_contains "$output" "nonexistent-task.md"
+}
+
+@test "task_storage_fetch returns exit 1 for missing backlog ref" {
+  config_init
+  config_set "task_storage.provider" "backlog"
+  make_fake_git_repo
+  mkdir -p backlog/tasks
+  # Create a single task so the backlog dir exists but our ref doesn't
+  cat > backlog/tasks/task-999-real.md <<'EOF'
+---
+id: TASK-999
+title: Existing task
+status: To Do
+---
+body
+EOF
+  git add -A && git commit --quiet -m "add backlog"
+  run task_storage_fetch "TASK-DOESNOTEXIST"
+  assert_equal "1" "$status"
+  assert_contains "$output" "not found"
+}
+
 # -------- Notion provider tests (mocked MCP calls) --------
 
 @test "notion: task_storage_fetch returns normalized task JSON" {

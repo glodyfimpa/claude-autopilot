@@ -37,9 +37,13 @@ source "${CLAUDE_PLUGIN_ROOT}/lib/ci-watcher.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/complexity-estimator.sh"
 ```
 
-### Step 2: Fetch the task
+### Step 2: Fetch the task (pre-flight check)
 
-Run `task_storage_fetch "$ARGUMENTS"` and parse the JSON. Fail fast with a clear message if the provider returns exit 2 (stub) or 1 (missing ref).
+Run `task_storage_fetch "$ARGUMENTS"` and capture the exit code. This MUST succeed before any branch is created.
+
+- **Exit 0**: Parse the JSON and proceed to Step 3.
+- **Exit 1**: The task ref was not found. Print: `Pre-flight failed: task ref '<ref>' not found in task storage. Verify the ref exists and the task_storage.provider is correctly configured (current: <provider>).` STOP here — do NOT create any branch or proceed further.
+- **Exit 2**: The provider is a stub (not implemented). Print: `Pre-flight failed: task storage provider '<provider>' is a stub and cannot fetch tasks. Configure an implemented provider with /autopilot-configure task-storage.` STOP here.
 
 ### Step 3: Estimate complexity
 
