@@ -1,15 +1,15 @@
 ---
 id: TASK-1777664400001
 title: plugin-cache-doctor command to diagnose stale plugin installations
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-25'
+updated_date: '2026-04-25 15:30'
 labels:
   - enhancement
   - tooling
-priority: medium
 dependencies: []
-parent_task_id:
+priority: medium
 ---
 
 ## Description
@@ -31,15 +31,21 @@ Discovered during v0.4.0 release session: claude-autopilot was missing because c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Command lists all plugins in manifest and reports each as healthy/stale/orphan
-- [ ] #2 For stale entries, shows the missing path and suggests `claude plugin install <name>` after manifest cleanup
-- [ ] #3 For orphan caches, shows the path and suggests `rm -rf` after confirmation
-- [ ] #4 Dry-run mode (`--check`) reports findings without executing
-- [ ] #5 Idempotent: running twice on a healthy state is a no-op
+- [x] #1 Command lists all plugins in manifest and reports each as healthy/stale/orphan
+- [x] #2 For stale entries, shows the missing path and suggests `claude plugin install <name>` after manifest cleanup
+- [x] #3 For orphan caches, shows the path and suggests `rm -rf` after confirmation
+- [x] #4 Dry-run mode (`--check`) reports findings without executing
+- [x] #5 Idempotent: running twice on a healthy state is a no-op
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped via PR #14 (https://github.com/glodyfimpa/claude-autopilot/pull/14). New `/plugin-cache-doctor` command diagnoses desync between `~/.claude/plugins/installed_plugins.json` (manifest) and the on-disk `cache/<plugin>/<version>/` folders. Library `lib/plugin-cache-doctor.sh` exposes `diagnose_plugins`, `diagnose_plugins_json`, `doctor_check`, `suggest_fixes`. Dry-run by default; --fix mode gated by user confirmation. 14 bats tests cover stale/orphan/healthy/empty-manifest/missing-manifest with mocked PLUGINS_ROOT in tmpdir. Smoke test on real ~/.claude/plugins identified dozens of stale entries pointing at the old commit-hash folders (b36fd4b75301) after claude-plugins-official upstream switched to semver — exactly the v0.4.0 release-session scenario that motivated the task. Schema gotcha caught and fixed: real manifest is `.plugins[name] = [array of install records]` with `installPath`, not the simpler single-object schema assumed initially.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 bats test covers stale/orphan/healthy scenarios with mocked filesystem
-- [ ] #2 Manual smoke test on a real stale plugin confirms the fix works end-to-end
+- [x] #1 bats test covers stale/orphan/healthy scenarios with mocked filesystem
+- [x] #2 Manual smoke test on a real stale plugin confirms the fix works end-to-end
 <!-- DOD:END -->
