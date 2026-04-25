@@ -49,3 +49,4 @@ After parallel runs: `git checkout -- . && git clean -fd <leaked-dirs> && git wo
 - Provider matrix in README is auto-generated: run `scripts/generate-readme-matrix.sh` and verify match
 - Bump version in `.claude-plugin/plugin.json`
 - Tag format: `git tag -a vX.Y.Z -m "changelog"`
+- README test count merge conflict pattern: when N feature PRs each bump `Current state: N tests`, every PR after the first gets a conflict on that line. Resolution formula: `new_count = count_main_post_previous_merges + (count_branch_current − count_branch_baseline)`. Verify with `bats tests/lib/ | grep -c "^ok "` BEFORE the merge commit. Validated 3x during v0.5.0 sprint (PRs #15, #16, #17)
