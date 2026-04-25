@@ -121,6 +121,40 @@ Call `wait_for_ci "$head_ref"` where `$head_ref` is the commit SHA that was push
 - **Exit 2**: Provider is a stub (gitlab/bitbucket). Proceed without blocking.
 - **Exit 1**: CI failed. Roll the task status back to `in_progress` by calling `task_storage_update_status "$ARGUMENTS" "in_progress"`. Surface the failure log to the user and stop. Do NOT mark the task as done.
 
+### Step 8.6: Execute the test plan before declaring the task done
+
+The PR body Claude wrote in Step 8 includes a `## Test plan` section with a checklist. Before marking the task done, every item on that list must be verified — either executed (for shell commands, scripts, bats invocations) or flagged for manual review (for subjective checks like "verify the dropdown looks correct").
+
+The motivation: PRs were repeatedly handed off with unchecked test plan items that, when run later, all passed — they just weren't run before declaring "done". This step closes that gap.
+
+#### How to do it
+
+1. Read the PR body via `gh pr view <pr-number> --json body --jq .body`.
+2. Locate the `## Test plan` section. Each line of the form `- [ ] <text>` is an unchecked item.
+3. For each unchecked item, classify it:
+   - **Executable**: line contains a fenced code block, an inline backtick command, a path to a bats file (`tests/lib/*.bats`), or a recognisable invocation (`npm test`, `pytest`, `bats`, `bash <script>`, `gh ...`).
+   - **Manual**: anything else (e.g. "verify the dropdown looks correct", "smoke test in the UI"). Cannot be automated.
+4. Run each executable item:
+   - Capture stdout, stderr, and exit code.
+   - On exit 0, mark the item as passed.
+   - On any non-zero exit, mark it as failed and STOP — do not proceed to Step 9.
+5. After all executable items have run, build a new PR body where:
+   - Every passing executable item becomes `- [x] <text>`.
+   - Every failing executable item stays `- [ ] <text>` with an inline `_(failed: <one-line reason>)_` annotation.
+   - Every manual item stays `- [ ] <text>` with an inline `_(manual review)_` annotation.
+6. Update the PR with `gh pr edit <pr-number> --body-file <new-body-file>`.
+7. If any executable item failed: surface the failure to the user, roll the task status back to `in_progress` via `task_storage_update_status "$ARGUMENTS" "in_progress"`, and STOP. Do NOT proceed to Step 9.
+8. If at least one item is `_(manual review)_`, tell the user the task is `done pending manual review` and pause for confirmation before Step 9. Manual items can be acknowledged with a single user reply.
+
+#### What counts as "passing"
+
+The test plan is a contract with the reviewer. An item passes only if:
+- It was actually executed in this run (no "trust me, it worked last time").
+- The exit code was 0.
+- The output is captured and stored in the PR body update so the reviewer can see what ran.
+
+Skipping this step in Auto mode is not allowed — the rule applies whether the user is interactive or not.
+
 ### Step 9: Mark the task as done
 
 Call `task_storage_update_status "$ARGUMENTS" "done"`. Print the PR URL to the user.
