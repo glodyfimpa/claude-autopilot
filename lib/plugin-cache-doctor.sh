@@ -4,15 +4,46 @@
 # and ~/.claude/plugins/cache/<plugin>/<version>/ (filesystem).
 #
 # Override target via PLUGINS_ROOT env var (used by tests).
+#
+# Real manifest schema:
+#   .plugins[<plugin-id>] = [
+#     { "scope": "user|project", "installPath": "<abs path>", "version": "...",
+#       "projectPath": "...", "gitCommitSha": "...", ... }
+#   ]
+# A plugin can have multiple install records (e.g. one per scope). Each record
+# has its own installPath; we treat each record independently when classifying
+# healthy vs stale.
 
-PLUGINS_ROOT="${PLUGINS_ROOT:-$HOME/.claude/plugins}"
+_plugins_root() {
+  if [ -n "${PLUGINS_ROOT:-}" ]; then
+    echo "$PLUGINS_ROOT"
+  else
+    echo "$HOME/.claude/plugins"
+  fi
+}
 
 _manifest_path() {
-  echo "$PLUGINS_ROOT/installed_plugins.json"
+  echo "$(_plugins_root)/installed_plugins.json"
 }
 
 _cache_root() {
-  echo "$PLUGINS_ROOT/cache"
+  echo "$(_plugins_root)/cache"
+}
+
+# Emit lines "<name>\t<installPath>" for every install record in the manifest.
+_iter_manifest_records() {
+  local manifest="$1"
+  jq -r '
+    .plugins // {}
+    | to_entries[]
+    | .key as $name
+    | (.value
+       | (if type == "array" then . else [.] end)
+       | .[]
+       | (.installPath // .path // empty)
+       | "\($name)\t\(.)"
+      )
+  ' "$manifest"
 }
 
 # diagnose_plugins
@@ -34,29 +65,24 @@ diagnose_plugins() {
   if [ "$plugin_count" = "0" ]; then
     echo "no plugins in manifest"
   else
-    # For each manifest entry: healthy if path exists, stale otherwise.
-    local names
-    names="$(jq -r '.plugins | keys[]' "$manifest")"
-    local name path
-    for name in $names; do
-      path="$(jq -r --arg n "$name" '.plugins[$n].path' "$manifest")"
+    local line name path
+    while IFS=$'\t' read -r name path; do
+      [ -z "$name" ] && continue
       if [ -d "$path" ]; then
         echo "healthy: $name -> $path"
       else
         echo "stale:   $name -> $path (missing)"
       fi
-    done
+    done < <(_iter_manifest_records "$manifest")
   fi
 
-  # Orphans: cache folders not referenced by any manifest path.
   if [ -d "$cache_root" ]; then
-    local plugin_dir version_dir manifest_paths
-    manifest_paths="$(jq -r '.plugins | to_entries[] | .value.path' "$manifest" 2>/dev/null)"
+    local manifest_paths plugin_dir version_dir clean_path
+    manifest_paths="$(_iter_manifest_records "$manifest" | cut -f2-)"
     for plugin_dir in "$cache_root"/*/; do
       [ -d "$plugin_dir" ] || continue
       for version_dir in "$plugin_dir"*/; do
         [ -d "$version_dir" ] || continue
-        local clean_path
         clean_path="${version_dir%/}"
         if ! echo "$manifest_paths" | grep -Fxq "$clean_path"; then
           echo "orphan:  $clean_path"
@@ -79,23 +105,21 @@ diagnose_plugins_json() {
   fi
 
   local healthy='[]' stale='[]' orphans='[]'
-
-  local names
-  names="$(jq -r '.plugins | keys[]?' "$manifest")"
   local name path entry
-  for name in $names; do
-    path="$(jq -r --arg n "$name" '.plugins[$n].path' "$manifest")"
+
+  while IFS=$'\t' read -r name path; do
+    [ -z "$name" ] && continue
     entry="$(jq -n --arg n "$name" --arg p "$path" '{name:$n,path:$p}')"
     if [ -d "$path" ]; then
       healthy="$(echo "$healthy" | jq --argjson e "$entry" '. + [$e]')"
     else
       stale="$(echo "$stale" | jq --argjson e "$entry" '. + [$e]')"
     fi
-  done
+  done < <(_iter_manifest_records "$manifest")
 
   if [ -d "$cache_root" ]; then
     local manifest_paths plugin_dir version_dir clean_path
-    manifest_paths="$(jq -r '.plugins | to_entries[]? | .value.path' "$manifest")"
+    manifest_paths="$(_iter_manifest_records "$manifest" | cut -f2-)"
     for plugin_dir in "$cache_root"/*/; do
       [ -d "$plugin_dir" ] || continue
       for version_dir in "$plugin_dir"*/; do

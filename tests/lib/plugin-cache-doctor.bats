@@ -22,17 +22,21 @@ teardown() {
   teardown_isolated_tmpdir
 }
 
-# Helper: create a manifest entry for plugin <name> pointing at cache <version>
+# Helper: create a manifest entry for plugin <name> pointing at cache <version>.
+# Matches the real Claude Code schema: .plugins[name] is an ARRAY of install
+# records, each with scope/installPath/version.
 write_manifest() {
   local name="$1" version="$2"
   cat > "$PLUGINS_ROOT/installed_plugins.json" <<EOF
 {
   "plugins": {
-    "$name": {
-      "name": "$name",
-      "version": "$version",
-      "path": "$PLUGINS_ROOT/cache/$name/$version"
-    }
+    "$name": [
+      {
+        "scope": "user",
+        "installPath": "$PLUGINS_ROOT/cache/$name/$version",
+        "version": "$version"
+      }
+    ]
   }
 }
 EOF
