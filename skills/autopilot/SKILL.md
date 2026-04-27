@@ -22,7 +22,38 @@ Used by `/autopilot-task` and every subagent spawned by `/autopilot-sprint`. The
 7. **Code simplification** -- if `simplify.mode` is `auto` (check with `config_get "simplify.mode"`; treat missing/empty as `auto`), invoke the code-simplifier subagent on the changed files: *"use a code-simplifier subagent to review and simplify the changes"*. If `simplify.mode` is `manual`, skip this step (the user can run `/simplify` themselves). If `simplify.mode` is `off`, skip entirely with no message. After simplification, re-run quality gates to confirm the simplified code still passes.
 8. **Frontend verification** -- if `frontend_verify.provider` is not `none` (check with `config_get "frontend_verify.provider"`), run `frontend_verify_run` from `lib/frontend-verify-adapter.sh`. The adapter dispatches to chrome-devtools or playwright and returns a pass/fail report. If verification fails, fix the issues and re-verify. If the provider is `none`, this step is silently skipped.
 9. When code quality, simplification, and frontend verification pass AND every acceptance criterion is satisfied, call the `security-reviewer` subagent: *"use a security-reviewer subagent to check the changes"*.
-10. When the security review has no blocking findings, write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
+10. **Real-data smoke test** — before declaring the task complete, exercise at least ONE assumption against the actual external resource the code depends on. See "Real-data smoke test" below.
+11. When the security review has no blocking findings AND the smoke test confirmed real-world behavior matches the fixtures (or the smoke step was a no-op for an internal-only task), write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
+
+### Real-data smoke test
+
+Synthetic fixtures cover logic correctness but cannot detect wrong assumptions about external data shapes. The 2026-04-25 sprint hit this on the plugin-cache-doctor task: fixtures encoded `.plugins[name]` as a single object, but the real `~/.claude/plugins/installed_plugins.json` schema is an array of install records. Tests passed; the bug was caught only by an opportunistic real-file read.
+
+**When the smoke step is required.** Apply this heuristic:
+
+- The task touches a file under `lib/<x>-providers/` (any provider implementation), OR
+- The task reads from `$HOME` / `~/`, a network resource, or an MCP-backed system, OR
+- The task description mentions a real external path, URL, or API.
+
+If none of those apply (pure refactors, doc-only changes, internal-state-only logic), the step is a documented no-op — note it in the PR body as `Smoke test: not applicable (internal state only)` and proceed.
+
+**What the smoke does.** A single read-only call against the actual resource:
+
+- Filesystem fixture: `head -c 500 ~/path/to/real/file | jq .` to confirm the schema.
+- HTTP endpoint: `curl -sI <url>` for headers, or `curl -s <url> | jq '...' | head` for body.
+- MCP tool: invoke the read-only equivalent (`notion-fetch`, `jira_client_fetch_issue`, `gh api ...`) on a real id.
+- CLI surface: `<binary> --version` or `<binary> <subcommand> --help`.
+
+The point is not exhaustiveness. The point is to exercise the assumption your fixtures encode.
+
+**What to do with the output.**
+
+1. Capture stdout (or a representative excerpt) verbatim.
+2. Compare against the synthetic fixture used in the test suite.
+3. **If they match.** Paste the smoke output into the PR body under a `## Smoke test` section. Move on to the marker.
+4. **If they diverge.** Surface the divergence to the user with explicit reasoning (e.g. "fixture assumes `.foo` is a string but real data shows `.foo` is an array of strings"). Update the fixture to reflect reality, re-run the gates from step 4, and re-run the smoke. Do NOT write the marker while a divergence is unresolved.
+
+A divergence detected here is the cheapest place to catch it. Better than after the PR is open and a downstream consumer hits the real shape in production.
 
 ### Task-complete marker
 
@@ -41,6 +72,7 @@ When the Stop hook sees this marker, it emits a "task complete" signal instead o
 - Code simplification passed (or `simplify.mode` is `off`/`manual`).
 - Frontend verification passed (or `frontend_verify.provider` is `none`).
 - The security-reviewer subagent returned no blocking findings.
+- The real-data smoke test ran (or the task qualifies as no-op) and any divergence was resolved.
 - The working tree has real changes to commit.
 
 ### Operating rules
