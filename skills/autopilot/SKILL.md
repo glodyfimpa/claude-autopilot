@@ -37,6 +37,28 @@ Synthetic fixtures cover logic correctness but cannot detect wrong assumptions a
 
 If none of those apply (pure refactors, doc-only changes, internal-state-only logic), the step is a documented no-op — note it in the PR body as `Smoke test: not applicable (internal state only)` and proceed.
 
+**Self-modification detection.** When the task modifies the autopilot plugin itself there is no external resource to exercise — the rule the smoke step would test IS the rule being changed. Detect this case automatically rather than relying on the implementer to remember.
+
+Run `git diff --name-only main..HEAD` and classify the changed paths:
+
+- **Plugin-internal paths** (count toward self-modification):
+  - `skills/autopilot/**` — the skill that defines the rule
+  - `commands/autopilot*.md` — the slash commands that invoke the skill
+  - `lib/*-adapter.sh` — the adapter dispatch layer (NOT the providers)
+  - `hooks/**` — the Stop / SessionStart / PreToolUse hooks
+  - `scripts/**` — release / generate / maintenance scripts
+- **External-touching paths** (do NOT count — smoke still required):
+  - `lib/<x>-providers/**` — concrete provider implementations exercise real services
+  - any path outside `lib/`, `skills/`, `commands/`, `hooks/`, `scripts/`
+
+If EVERY changed file is plugin-internal AND no file is external-touching, mark the smoke step as no-op automatically. Auto-fill the PR body's `## Smoke test` section with exactly:
+
+```
+Smoke test: not applicable — task modifies the autopilot plugin itself (no external resource to exercise).
+```
+
+Mixed changes (e.g. `lib/wizard.sh` plus `lib/notion-providers/task-storage.sh`) still require a real smoke against the external surface. The presence of even one external-touching path defeats self-modification detection — provider work always smokes.
+
 **What the smoke does.** A single read-only call against the actual resource:
 
 - Filesystem fixture: `head -c 500 ~/path/to/real/file | jq .` to confirm the schema.

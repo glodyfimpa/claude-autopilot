@@ -1,7 +1,7 @@
 ---
 id: TASK-1777750800001
 title: 'autopilot-sprint: detect self-modification and skip smoke step (meta-circular)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 14:35'
 labels:
@@ -35,15 +35,15 @@ This closes the meta-circular gap: the skill knows when it's modifying itself.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/autopilot/SKILL.md adds a "Self-modification detection" subsection under "Real-data smoke test"
-- [ ] #2 The detector lists the paths that count as plugin-internal (skills, commands, adapter dispatch layer, hooks)
-- [ ] #3 The skill mandates auto-filling the `## Smoke test` section with the no-op explanation when self-modification is detected
-- [ ] #4 The provider-touching path (`lib/<x>-providers/`) is explicitly NOT classified as self-modification — provider work still requires real-data smoke
-- [ ] #5 README inner-loop description mentions the auto-detection
+- [x] #1 skills/autopilot/SKILL.md adds a "Self-modification detection" subsection under "Real-data smoke test"
+- [x] #2 The detector lists the paths that count as plugin-internal (skills, commands, adapter dispatch layer, hooks)
+- [x] #3 The skill mandates auto-filling the `## Smoke test` section with the no-op explanation when self-modification is detected
+- [x] #4 The provider-touching path (`lib/<x>-providers/`) is explicitly NOT classified as self-modification — provider work still requires real-data smoke
+- [x] #5 README inner-loop description mentions the auto-detection
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Manual review: walk the v0.6.0 sprint and confirm PR #21 would have auto-classified, while PR #19 (touches lib/git-version-check.sh — a non-provider lib file) and PR #20 (touches lib/task-storage-providers/) would NOT
-- [ ] #2 No regression on the existing real-data smoke step for normal tasks
+- [x] #1 Manual review: walk the v0.6.0 sprint and confirm PR #21 would have auto-classified, while PR #19 (touches lib/git-version-check.sh — a non-provider lib file) and PR #20 (touches lib/task-storage-providers/) would NOT
+- [x] #2 No regression on the existing real-data smoke step for normal tasks
 <!-- DOD:END -->
