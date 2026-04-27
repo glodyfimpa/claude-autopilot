@@ -37,6 +37,28 @@ Synthetic fixtures cover logic correctness but cannot detect wrong assumptions a
 
 If none of those apply (pure refactors, doc-only changes, internal-state-only logic), the step is a documented no-op — note it in the PR body as `Smoke test: not applicable (internal state only)` and proceed.
 
+**Self-modification detection.** When the task modifies the autopilot plugin itself there is no external resource to exercise — the rule the smoke step would test IS the rule being changed. Detect this case automatically rather than relying on the implementer to remember.
+
+Run `git diff --name-only main..HEAD` and classify the changed paths:
+
+- **Plugin-internal paths** (count toward self-modification):
+  - `skills/autopilot/**` — the skill that defines the rule
+  - `commands/autopilot*.md` — the slash commands that invoke the skill
+  - `lib/*-adapter.sh` — the adapter dispatch layer (NOT the providers)
+  - `hooks/**` — the Stop / SessionStart / PreToolUse hooks
+  - `scripts/**` — release / generate / maintenance scripts
+- **External-touching paths** (do NOT count — smoke still required):
+  - `lib/<x>-providers/**` — concrete provider implementations exercise real services
+  - any path outside `lib/`, `skills/`, `commands/`, `hooks/`, `scripts/`
+
+If EVERY changed file is plugin-internal AND no file is external-touching, mark the smoke step as no-op automatically. Auto-fill the PR body's `## Smoke test` section with exactly:
+
+```
+Smoke test: not applicable — task modifies the autopilot plugin itself (no external resource to exercise).
+```
+
+Mixed changes (e.g. `lib/wizard.sh` plus `lib/notion-providers/task-storage.sh`) still require a real smoke against the external surface. The presence of even one external-touching path defeats self-modification detection — provider work always smokes.
+
 **What the smoke does.** A single read-only call against the actual resource:
 
 - Filesystem fixture: `head -c 500 ~/path/to/real/file | jq .` to confirm the schema.
@@ -84,6 +106,44 @@ When the Stop hook sees this marker, it emits a "task complete" signal instead o
 - Use subagents for investigations that require reading many files — this protects the main context window.
 - If context fills up, use `/compact` to free space.
 - Never skip gates: if tests don't exist, create them before implementing the feature.
+
+### Shell pattern conventions
+
+Two recurring traps were rediscovered manually three times during the v0.6.0 sprint. The patterns below are the canonical workarounds; default to them rather than the heredoc forms.
+
+**Commit messages and PR bodies — always file-based.** For any message that exceeds one line OR contains apostrophes, backticks, dollar signs, or other shell-special characters, write the message to a file and pass it via `-F` / `--body-file`:
+
+```bash
+cat > /tmp/commit-msg.txt <<'EOF'
+feat(scope): one-line summary
+
+Body paragraph that may contain apostrophes, $variables, or `backticks`.
+EOF
+git commit -F /tmp/commit-msg.txt
+rm -f /tmp/commit-msg.txt
+```
+
+```bash
+cat > /tmp/pr-body.md <<'EOF'
+## Summary
+- Bullet with an apostrophe in it.
+EOF
+gh pr create --title "feat(scope): summary" --body-file /tmp/pr-body.md
+rm -f /tmp/pr-body.md
+```
+
+The `git commit -m "$(cat <<'EOF' ... EOF)"` and `gh pr create --body "$(cat ...)"` patterns collide with shell quoting on apostrophes and fail unpredictably. File-based is the default, not a fallback.
+
+**Bats suite outcome — count `^ok`, not `^not ok`.** When checking a bats run from a script or `run_in_background` block, use the positive-match grep:
+
+```bash
+bats tests/lib/ > /tmp/bats-out.txt 2>&1
+ok_count=$(grep -c "^ok " /tmp/bats-out.txt)
+not_ok_count=$(grep -c "^not ok " /tmp/bats-out.txt || true)
+echo "ok: $ok_count, not ok: $not_ok_count"
+```
+
+Do NOT pipe `bats ... | grep -c "^not ok"` and read the pipeline's exit code. `grep -c` exits 1 on zero matches even with `-c`, so a fully green suite (`0 not ok`) makes the pipeline exit non-zero — the background-task harness reports it as "failed" despite every test passing. The `|| true` guard above keeps the count assignment safe; the truth source is `ok_count` matching the expected total.
 
 ## Outer loop — full pipeline
 
