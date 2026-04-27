@@ -1,7 +1,7 @@
 ---
 id: TASK-1777664400005
 title: 'autopilot inner loop: add real-data smoke test slot before commit'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-25 15:37'
 labels:
@@ -30,15 +30,15 @@ This complements TASK-1776163200002 (test plan execution) which runs items alrea
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 #1 skills/autopilot/SKILL.md inner loop adds a smoke-test step between gates-green and task-complete marker
-- [ ] #2 #2 The skill describes the heuristic for when smoke is required (external resource access)
-- [ ] #3 #3 The smoke output is captured in the PR body under a new `## Smoke test` section
-- [ ] #4 #4 If smoke reveals a fixture mismatch, the loop iterates with explicit reasoning surfaced to the user
-- [ ] #5 #5 The step is documented as a no-op for tasks operating on internal state only
+- [x] #1 #1 skills/autopilot/SKILL.md inner loop adds a smoke-test step between gates-green and task-complete marker
+- [x] #2 #2 The skill describes the heuristic for when smoke is required (external resource access)
+- [x] #3 #3 The smoke output is captured in the PR body under a new `## Smoke test` section
+- [x] #4 #4 If smoke reveals a fixture mismatch, the loop iterates with explicit reasoning surfaced to the user
+- [x] #5 #5 The step is documented as a no-op for tasks operating on internal state only
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 #1 Manual validation: run /autopilot-task on a task that implicates an external resource (e.g. a new task-storage provider) and confirm the smoke step fires and captures real output
-- [ ] #2 #2 README updated to mention the smoke step in the inner-loop description
+- [x] #2 #2 README updated to mention the smoke step in the inner-loop description
 <!-- DOD:END -->

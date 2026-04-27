@@ -103,7 +103,7 @@ Runtime requirements:
 |----------|----------|-------|
 | Shell | `bash` 3.2+ | Works on macOS (stock bash), Linux, WSL, Git Bash on Windows |
 | JSON | `jq` 1.6+ | `brew install jq` or `apt-get install jq` |
-| Git | `git` 2.20+ | Required by the PR adapter and branch utilities |
+| Git | `git` 2.20+ | Strictly required for parallel sprint mode (`git worktree add --no-track`). On older git (e.g. macOS Xcode 2.15) `/autopilot-sprint` auto-detects and falls back to sequential execution with a clear log line — no crash. |
 | PR CLI | `gh` for GitHub, `glab` for GitLab, `bb` for Bitbucket | Only the one matching your pr-target provider |
 
 Supported pipeline providers (any tool with an MCP server can be added later):
@@ -136,7 +136,7 @@ Supported pipeline providers (any tool with an MCP server can be added later):
 
 The plugin has two loops that operate at different scopes.
 
-The **inner loop** is the quality gates cycle. After every Claude iteration the Stop hook reads the detected stack from `hooks/detect-stack.sh` and runs the four gate commands (test, lint, types, build) in sequence. If any gate fails, Claude receives the error output and tries again, up to five iterations per session. If all gates pass and the acceptance criteria for the active task are satisfied, Claude writes a marker file at `~/.claude/.autopilot-task-complete` and the hook emits a task-complete signal. The outer loop picks up the signal to commit, push, and open the PR. Without the marker, gates passing only means "this iteration was clean" and Claude keeps working on the rest of the task.
+The **inner loop** is the quality gates cycle. After every Claude iteration the Stop hook reads the detected stack from `hooks/detect-stack.sh` and runs the four gate commands (test, lint, types, build) in sequence. If any gate fails, Claude receives the error output and tries again, up to five iterations per session. If all gates pass and the acceptance criteria for the active task are satisfied, Claude runs a real-data smoke test (one read-only call against the actual external resource the task touches) to catch wrong assumptions about external schemas before the PR opens. Only then does Claude write a marker file at `~/.claude/.autopilot-task-complete` and the hook emits a task-complete signal. The outer loop picks up the signal to commit, push, and open the PR. Without the marker, gates passing only means "this iteration was clean" and Claude keeps working on the rest of the task.
 
 The **outer loop** is the PRD→PR pipeline and it is driven by four tool-agnostic adapters that live in `lib/`. `prd-source-adapter.sh` reads a spec from wherever it lives (local markdown, pasted chat, Notion page, Jira epic, Google Doc) and returns a normalized JSON object. Claude then decomposes the PRD into tasks interactively with the user and persists them through `task-storage-adapter.sh` to the configured backend. `/autopilot-task` cuts a fresh branch from `main` using the Echofold naming convention (`feat/{PROJECT}-{ticket}-{slug}` or `fix/{PROJECT}-{ticket}-{slug}`), runs the inner loop until the task-complete marker is set, then calls `pr-adapter.sh` to open the PR on the configured host. `/autopilot-sprint` adds the fourth adapter, `parallelization-adapter.sh`, which decides based on task complexity and shared-file dependencies whether to run tasks sequentially or in parallel worktrees.
 
@@ -186,6 +186,7 @@ claude-autopilot/                                    the plugin
 │   ├── wizard.sh                                    non-interactive wizard helpers
 │   ├── complexity-estimator.sh                      task tier scoring (trivial/standard/complex/epic)
 │   ├── parallelization-adapter.sh                   plan execution: sequential vs parallel
+│   ├── git-version-check.sh                         pre-flight: git 2.20+ for worktree --no-track
 │   ├── prd-source-adapter.sh                        PRD source dispatcher
 │   ├── prd-source-providers/                        local-file, chat-paste, notion, jira, google-drive
 │   ├── task-storage-adapter.sh                      task storage dispatcher
@@ -251,7 +252,7 @@ Run the full suite:
 bats tests/lib/
 ```
 
-Current state: 321 tests, all green on macOS bash 3.2.
+Current state: 335 tests, all green on macOS bash 3.2.
 
 When adding a feature:
 
