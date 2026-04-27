@@ -3,7 +3,7 @@ id: TASK-1777664400003
 title: >-
   autopilot-sprint: pre-flight check on git version + graceful downgrade to
   sequential
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-25 15:36'
 labels:
@@ -33,15 +33,15 @@ This was hit during the 2026-04-25 sprint that implemented TASK-17776644000XX se
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 #1 lib/git-version-check.sh exposes a function `git_supports_worktree_no_track` returning 0/1
-- [ ] #2 #2 autopilot-sprint Step 1.5 calls the check and overrides strategy to sequential when unsupported
-- [ ] #3 #3 The downgrade is logged with the detected git version and the required minimum (2.20)
-- [ ] #4 #4 bats tests cover: git 2.15 (downgrade), git 2.20 (no downgrade), git 2.42 (no downgrade), missing git binary (clear error)
-- [ ] #5 #5 Documentation in README mentions the git 2.20 requirement for parallel mode
+- [x] #1 #1 lib/git-version-check.sh exposes a function `git_supports_worktree_no_track` returning 0/1
+- [x] #2 #2 autopilot-sprint Step 1.5 calls the check and overrides strategy to sequential when unsupported
+- [x] #3 #3 The downgrade is logged with the detected git version and the required minimum (2.20)
+- [x] #4 #4 bats tests cover: git 2.15 (downgrade), git 2.20 (no downgrade), git 2.42 (no downgrade), missing git binary (clear error)
+- [x] #5 #5 Documentation in README mentions the git 2.20 requirement for parallel mode
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 #1 All bats tests green
-- [ ] #2 #2 Manual smoke test on a system with git < 2.20 confirms graceful sequential fallback (no crash)
+- [x] #1 #1 All bats tests green
+- [x] #2 #2 Manual smoke test on a system with git < 2.20 confirms graceful sequential fallback (no crash)
 <!-- DOD:END -->

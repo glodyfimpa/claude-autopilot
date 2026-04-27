@@ -103,7 +103,7 @@ Runtime requirements:
 |----------|----------|-------|
 | Shell | `bash` 3.2+ | Works on macOS (stock bash), Linux, WSL, Git Bash on Windows |
 | JSON | `jq` 1.6+ | `brew install jq` or `apt-get install jq` |
-| Git | `git` 2.20+ | Required by the PR adapter and branch utilities |
+| Git | `git` 2.20+ | Strictly required for parallel sprint mode (`git worktree add --no-track`). On older git (e.g. macOS Xcode 2.15) `/autopilot-sprint` auto-detects and falls back to sequential execution with a clear log line — no crash. |
 | PR CLI | `gh` for GitHub, `glab` for GitLab, `bb` for Bitbucket | Only the one matching your pr-target provider |
 
 Supported pipeline providers (any tool with an MCP server can be added later):
@@ -186,6 +186,7 @@ claude-autopilot/                                    the plugin
 │   ├── wizard.sh                                    non-interactive wizard helpers
 │   ├── complexity-estimator.sh                      task tier scoring (trivial/standard/complex/epic)
 │   ├── parallelization-adapter.sh                   plan execution: sequential vs parallel
+│   ├── git-version-check.sh                         pre-flight: git 2.20+ for worktree --no-track
 │   ├── prd-source-adapter.sh                        PRD source dispatcher
 │   ├── prd-source-providers/                        local-file, chat-paste, notion, jira, google-drive
 │   ├── task-storage-adapter.sh                      task storage dispatcher
@@ -251,7 +252,7 @@ Run the full suite:
 bats tests/lib/
 ```
 
-Current state: 301 tests, all green on macOS bash 3.2.
+Current state: 315 tests, all green on macOS bash 3.2.
 
 When adding a feature:
 
