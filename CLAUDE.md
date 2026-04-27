@@ -45,8 +45,8 @@ After parallel runs: `git checkout -- . && git clean -fd <leaked-dirs> && git wo
   resolve conflicts → run full test suite → open single PR
 
 ## Release
-- Update test count in README.md on each release (search "Current state:")
-- Provider matrix in README is auto-generated: run `scripts/generate-readme-matrix.sh` and verify match
-- Bump version in `.claude-plugin/plugin.json`
-- Tag format: `git tag -a vX.Y.Z -m "changelog"`
-- README test count merge conflict pattern: when N feature PRs each bump `Current state: N tests`, every PR after the first gets a conflict on that line. Resolution formula: `new_count = count_main_post_previous_merges + (count_branch_current − count_branch_baseline)`. Verify with `bats tests/lib/ | grep -c "^ok "` BEFORE the merge commit. Validated 3x during v0.5.0 sprint (PRs #15, #16, #17)
+- Canonical flow: `scripts/release.sh <version>` (since v0.7.0). Does the full sequence in one command — preconditions check, bats run + green count capture, README test count sync, plugin.json bump, draft changelog from PR-merge commits since previous tag, optional `$EDITOR` pass on annotation, commit + annotated tag + push + `gh release create`. See README "Releasing" section for flag reference (`--dry-run`, `--no-edit`).
+- Provider matrix in README is auto-generated: run `scripts/generate-readme-matrix.sh` and verify match (separate concern from the release script).
+- Manual fallback (only if `scripts/release.sh` is unusable): bump `.claude-plugin/plugin.json`, sync `Current state: NNN tests` in README to match `bats tests/lib/ | grep -c "^ok "`, `git tag -a vX.Y.Z -m "changelog"`, push commit + tag, `gh release create`.
+- README test count merge conflict pattern (still relevant when N feature PRs each bump the count): when N feature PRs each bump `Current state: N tests`, every PR after the first gets a conflict on that line. Resolution formula: `new_count = count_main_post_previous_merges + (count_branch_current − count_branch_baseline)`. Verify with `bats tests/lib/ | grep -c "^ok "` BEFORE the merge commit. Validated 3x during v0.5.0 sprint (PRs #15, #16, #17). The `compute_metric_overlap` signal in `lib/file-overlap-detector.sh` (since v0.7.0) flags this proactively at sprint planning time.
+- Pre-flight: working tree must be clean (`git status --porcelain` empty). Common trap: untracked `.claude/` from Claude Code state files. Add `/.claude/` (root-anchored) to `.gitignore` if not already present — `release.sh` will refuse to run otherwise.
