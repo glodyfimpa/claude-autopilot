@@ -32,7 +32,32 @@ source "${CLAUDE_PLUGIN_ROOT}/lib/parallelization-adapter.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/branch-utils.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/pr-adapter.sh"
 source "${CLAUDE_PLUGIN_ROOT}/lib/file-overlap-detector.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/git-version-check.sh"
 ```
+
+### Step 1.5: Pre-flight check on git version
+
+Parallel mode spawns subagents with `isolation: "worktree"`, which uses
+`git worktree add --no-track` (added in git 2.20). On older git (e.g. macOS
+Xcode toolchains shipping git 2.15) the spawn fails with
+`error: unknown option no-track`.
+
+Check before planning so the planner output can be safely overridden:
+
+```bash
+detected_version="$(git_supports_worktree_no_track)"
+git_check_status=$?
+case "$git_check_status" in
+  0)  PARALLEL_OK=1 ;;
+  1)  PARALLEL_OK=0
+      echo "git $detected_version detected; parallel worktrees require git 2.20+. Falling back to sequential strategy." ;;
+  2)  echo "ERROR: $detected_version" >&2; exit 1 ;;
+esac
+```
+
+When `PARALLEL_OK=0`, after Step 4 force-set `strategy = "sequential"` on the
+plan regardless of what `plan_execution` returned, and proceed via Step 6a.
+A missing/unparseable git binary (status 2) is fatal — autopilot needs git.
 
 ### Step 2: List ready tasks
 
