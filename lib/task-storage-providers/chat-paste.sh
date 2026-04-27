@@ -10,6 +10,11 @@
 #   - create is not supported (return 2)
 #   - list is not supported (return 2)
 
+task_storage_chat_paste_status_map() {
+  # Identity map — chat-paste already uses canonical values.
+  jq -n '{ready: "ready", in_progress: "in_progress", done: "done"}'
+}
+
 task_storage_chat_paste_fetch() {
   local ref="$1"
   if [[ -z "$ref" ]]; then

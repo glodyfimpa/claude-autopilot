@@ -252,7 +252,7 @@ Run the full suite:
 bats tests/lib/
 ```
 
-Current state: 315 tests, all green on macOS bash 3.2.
+Current state: 335 tests, all green on macOS bash 3.2.
 
 When adding a feature:
 

@@ -17,6 +17,18 @@ LINEAR_TS_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$LINEAR_TS_SELF_DIR/../linear-client.sh"
 
+task_storage_linear_status_map() {
+  local ready_val in_prog_val done_val
+  ready_val="$(_linear_ts_status_value "ready")"
+  in_prog_val="$(_linear_ts_status_value "in_progress")"
+  done_val="$(_linear_ts_status_value "done")"
+  jq -n \
+    --arg ready "$ready_val" \
+    --arg in_prog "$in_prog_val" \
+    --arg done_v "$done_val" \
+    '{($ready): "ready", ($in_prog): "in_progress", ($done_v): "done"}'
+}
+
 # Map an internal status name (ready, in_progress, done) to the Linear value.
 _linear_ts_status_value() {
   local internal="$1"

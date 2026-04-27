@@ -11,6 +11,18 @@
 
 BACKLOG_TASKS_DIR="backlog/tasks"
 
+task_storage_backlog_status_map() {
+  # "To Do" listed first so denormalize_status_value picks it as the
+  # canonical write-back native for ready (Draft also normalizes to ready
+  # on read, but we never write Draft).
+  jq -n '{
+    "To Do": "ready",
+    "Draft": "ready",
+    "In Progress": "in_progress",
+    "Done": "done"
+  }'
+}
+
 # Map internal status names to Backlog.md display names
 _backlog_status_to_display() {
   case "$1" in
