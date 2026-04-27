@@ -1,7 +1,7 @@
 ---
 id: TASK-1777750800003
 title: 'file-overlap-detector: add metric-overlap signal for bundled PR recommendation'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 14:35'
 labels:
@@ -33,16 +33,16 @@ This catches the v0.6.0 case proactively: with the new signal, the planner would
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 lib/file-overlap-detector.sh exposes `compute_metric_overlap`
-- [ ] #2 The function detects shared README test-count line, plugin.json version, CHANGELOG.md top entry
-- [ ] #3 `compute_overlap` returns the union: `{byTask, overlaps, metricOverlaps, hasOverlap}` where hasOverlap is true if either kind of overlap exists
-- [ ] #4 `recommend_pr_strategy` returns `bundled` when metric overlap covers all tasks (even if file overlap is empty)
-- [ ] #5 The `autopilot-sprint` skill Step 5.1 displays metric overlaps to the user with the same matrix format
-- [ ] #6 bats tests cover: 3 task-adding tasks (metric overlap), 1 doc-only + 2 code tasks (no metric overlap), all 3 release tasks (3 metric overlaps), mixed
+- [x] #1 lib/file-overlap-detector.sh exposes `compute_metric_overlap`
+- [x] #2 The function detects shared README test-count line, plugin.json version, CHANGELOG.md top entry
+- [x] #3 `compute_overlap` returns the union: `{byTask, overlaps, metricOverlaps, hasOverlap}` where hasOverlap is true if either kind of overlap exists
+- [x] #4 `recommend_pr_strategy` returns `bundled` when metric overlap covers all tasks (even if file overlap is empty)
+- [x] #5 The `autopilot-sprint` skill Step 5.1 displays metric overlaps to the user with the same matrix format
+- [x] #6 bats tests cover: 3 task-adding tasks (metric overlap), 1 doc-only + 2 code tasks (no metric overlap), all 3 release tasks (3 metric overlaps), mixed
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 All bats tests green
-- [ ] #2 Manual replay: feed the v0.6.0 sprint task JSON and confirm `recommend_pr_strategy` returns `bundled` instead of `separate`
+- [x] #1 All bats tests green
+- [x] #2 Manual replay: feed the v0.6.0 sprint task JSON and confirm `recommend_pr_strategy` returns `bundled` instead of `separate`
 <!-- DOD:END -->

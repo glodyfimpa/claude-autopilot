@@ -42,6 +42,79 @@ extract_files_from_task() {
   extract_files_from_text "$combined"
 }
 
+# _task_touches_metric <task_json> <metric>
+# Heuristic: does the task description/criteria mention something that
+# makes it "touch" a known shared metric line at merge time?
+#   metric = "readme_test_count" -> task adds bats tests
+#   metric = "plugin_version"    -> task bumps plugin.json
+#   metric = "changelog"         -> task is a release task
+_task_touches_metric() {
+  local task_json="$1" metric="$2"
+  local text
+  text="$(echo "$task_json" | jq -r '
+    [
+      .description // "",
+      .title // "",
+      ((.acceptanceCriteria // []) | join(" "))
+    ] | join(" ")
+  ')"
+
+  case "$metric" in
+    readme_test_count)
+      echo "$text" | grep -Eq '(tests/lib/[a-zA-Z0-9._-]+\.bats|\.bats\b|bats test|bats suite)' && return 0
+      return 1
+      ;;
+    plugin_version)
+      echo "$text" | grep -Eq '(\.claude-plugin/plugin\.json|plugin\.json)' && return 0
+      return 1
+      ;;
+    changelog)
+      echo "$text" | grep -Eiq '(release v?[0-9]+\.[0-9]+\.[0-9]+|^release\b|hotfix v?[0-9])' && return 0
+      return 1
+      ;;
+  esac
+  return 1
+}
+
+# compute_metric_overlap <tasks_json>
+# Detects shared metric lines that 2+ tasks would touch even when they
+# don't share source files. Returns:
+#   { "metricOverlaps": [ { "line": "...", "tasks": ["T1","T2"] } ] }
+compute_metric_overlap() {
+  local tasks="$1"
+
+  local known_metrics='[
+    {"key":"readme_test_count","line":"README.md: Current state: NNN tests"},
+    {"key":"plugin_version","line":".claude-plugin/plugin.json: version field"},
+    {"key":"changelog","line":"CHANGELOG.md: top entry"}
+  ]'
+
+  local result_overlaps='[]'
+  local key line_label task_ids matching_count
+
+  while IFS=$'\t' read -r key line_label; do
+    [ -z "$key" ] && continue
+    matching_ids='[]'
+    while read -r tid; do
+      [ -z "$tid" ] && continue
+      task_json="$(echo "$tasks" | jq --arg id "$tid" '.[] | select(.id == $id)')"
+      if _task_touches_metric "$task_json" "$key"; then
+        matching_ids="$(echo "$matching_ids" | jq --arg id "$tid" '. + [$id]')"
+      fi
+    done < <(echo "$tasks" | jq -r '.[].id')
+
+    matching_count="$(echo "$matching_ids" | jq 'length')"
+    if [ "$matching_count" -ge 2 ]; then
+      result_overlaps="$(echo "$result_overlaps" | jq \
+        --arg line "$line_label" \
+        --argjson ts "$matching_ids" \
+        '. + [{line: $line, tasks: $ts}]')"
+    fi
+  done < <(echo "$known_metrics" | jq -r '.[] | "\(.key)\t\(.line)"')
+
+  jq -n --argjson m "$result_overlaps" '{metricOverlaps: $m}'
+}
+
 # compute_overlap <tasks_json>
 # Takes a JSON array of tasks and returns a JSON object describing overlap:
 #   {
@@ -49,7 +122,10 @@ extract_files_from_task() {
 #     "overlaps": [
 #       { "file": "lib/wizard.sh", "tasks": ["TASK-1", "TASK-2"] }
 #     ],
-#     "hasOverlap": true|false
+#     "metricOverlaps": [
+#       { "line": "README.md: Current state: NNN tests", "tasks": ["T1","T2"] }
+#     ],
+#     "hasOverlap": true|false      # true if EITHER overlaps OR metricOverlaps is non-empty
 #   }
 compute_overlap() {
   local tasks="$1"
@@ -83,8 +159,18 @@ compute_overlap() {
     | flatten
   ')"
 
+  # Metric overlap (shared lines that 2+ tasks would touch even without
+  # sharing source files: README test count, plugin.json version, CHANGELOG).
+  local metric_overlaps_obj metric_overlaps
+  metric_overlaps_obj="$(compute_metric_overlap "$tasks")"
+  metric_overlaps="$(echo "$metric_overlaps_obj" | jq '.metricOverlaps')"
+
+  local file_overlap_count metric_overlap_count
+  file_overlap_count="$(echo "$overlaps" | jq 'length')"
+  metric_overlap_count="$(echo "$metric_overlaps" | jq 'length')"
+
   local has_overlap
-  if [ "$(echo "$overlaps" | jq 'length')" -gt 0 ]; then
+  if [ "$file_overlap_count" -gt 0 ] || [ "$metric_overlap_count" -gt 0 ]; then
     has_overlap=true
   else
     has_overlap=false
@@ -93,8 +179,9 @@ compute_overlap() {
   jq -n \
     --argjson by_task "$by_task" \
     --argjson overlaps "$overlaps" \
+    --argjson metric_overlaps "$metric_overlaps" \
     --argjson has_overlap "$has_overlap" \
-    '{byTask: $by_task, overlaps: $overlaps, hasOverlap: $has_overlap}'
+    '{byTask: $by_task, overlaps: $overlaps, metricOverlaps: $metric_overlaps, hasOverlap: $has_overlap}'
 }
 
 # group_by_overlap <tasks_json>
@@ -151,9 +238,11 @@ group_by_overlap() {
 
 # recommend_pr_strategy <tasks_json>
 # Maps the overlap state to a recommended strategy:
-#   - no overlap            -> "separate"
-#   - single overlap group  -> "bundled"
-#   - multiple overlap grps -> "grouped"
+#   - no overlap                                       -> "separate"
+#   - single file-overlap cluster                      -> "bundled"
+#   - multiple disjoint file-overlap clusters          -> "grouped"
+#   - file-overlap empty AND metric-overlap non-empty  -> "bundled"
+#     (cascading conflicts on shared metric lines like README test count)
 recommend_pr_strategy() {
   local tasks="$1"
   local overlap_data
@@ -163,6 +252,17 @@ recommend_pr_strategy() {
   has_overlap="$(echo "$overlap_data" | jq -r '.hasOverlap')"
   if [ "$has_overlap" != "true" ]; then
     echo "separate"
+    return 0
+  fi
+
+  local file_overlap_count metric_overlap_count
+  file_overlap_count="$(echo "$overlap_data" | jq '.overlaps | length')"
+  metric_overlap_count="$(echo "$overlap_data" | jq '.metricOverlaps | length')"
+
+  # No file overlap but metric overlap present: bundling avoids the
+  # cascading single-line merge conflicts (e.g. README test count).
+  if [ "$file_overlap_count" -eq 0 ] && [ "$metric_overlap_count" -gt 0 ]; then
+    echo "bundled"
     return 0
   fi
 

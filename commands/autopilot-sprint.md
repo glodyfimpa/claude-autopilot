@@ -97,21 +97,22 @@ overlap="$(compute_overlap "$enriched_tasks_json")"
 recommendation="$(recommend_pr_strategy "$enriched_tasks_json")"
 ```
 
-`compute_overlap` returns a JSON object with three fields:
+`compute_overlap` returns a JSON object with four fields:
 
 - `byTask` — map from task id to the list of files mentioned in its description/acceptance criteria
 - `overlaps` — list of `{file, tasks}` records, one per file that appears in 2+ tasks
-- `hasOverlap` — boolean shortcut
+- `metricOverlaps` — list of `{line, tasks}` records, one per shared metric line that 2+ tasks would touch even when they share no source files. Known metrics: `README.md` test count, `.claude-plugin/plugin.json` version field, `CHANGELOG.md` top entry. This catches the v0.6.0 regression where 3 PRs each bumped `Current state: NNN tests` and the second/third inherited a guaranteed merge conflict despite touching different `lib/` files.
+- `hasOverlap` — boolean shortcut, true when EITHER `overlaps` OR `metricOverlaps` is non-empty.
 
 Behavior:
 
 - **`hasOverlap == false`** → no warning, default to **(a) separate PRs**, jump to confirmation.
-- **`hasOverlap == true`** → show the user the overlap matrix and ask which PR strategy to use:
+- **`hasOverlap == true`** → show the user BOTH the file-overlap matrix and the metric-overlap matrix (same `{file/line, tasks}` format), then ask which PR strategy to use:
   - **(a) Separate PRs** — current behavior, one PR per task. Reviewer handles conflicts.
-  - **(b) Bundled PR** (recommended when one overlap cluster covers all/most tasks) — all tasks run in their own worktree branches, then their commits are cherry-picked sequentially into a single integration branch (`integration/sprint-<timestamp>`); conflicts are resolved during integration; one PR is opened listing all tasks.
-  - **(c) Grouped PRs** (recommended when there are multiple disjoint overlap clusters) — `group_by_overlap` partitions tasks into clusters; one PR per cluster, following the bundled flow within each.
+  - **(b) Bundled PR** (recommended when one overlap cluster covers all/most tasks, OR when only metric overlap is present) — all tasks run in their own worktree branches, then their commits are cherry-picked sequentially into a single integration branch (`integration/sprint-<timestamp>`); conflicts are resolved during integration; one PR is opened listing all tasks.
+  - **(c) Grouped PRs** (recommended when there are multiple disjoint file-overlap clusters) — `group_by_overlap` partitions tasks into clusters; one PR per cluster, following the bundled flow within each.
 
-Use `recommend_pr_strategy` as the default suggestion; the user can override.
+`recommend_pr_strategy` returns `bundled` whenever file overlap is empty but metric overlap covers 2+ tasks — bundling avoids the cascading single-line conflicts. Use it as the default suggestion; the user can override.
 
 Ask for confirmation before spawning any work.
 
