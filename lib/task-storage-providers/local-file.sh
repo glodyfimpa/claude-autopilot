@@ -20,6 +20,10 @@
 
 TASK_STORAGE_LOCAL_DIR="tasks"
 
+task_storage_local_file_status_map() {
+  jq -n '{ready: "ready", in_progress: "in_progress", done: "done"}'
+}
+
 # Parse a task file and print a JSON representation.
 # JSON shape:
 #   { id, title, description, status, acceptanceCriteria: [...] }

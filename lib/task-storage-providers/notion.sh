@@ -18,6 +18,18 @@ NOTION_TS_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$NOTION_TS_SELF_DIR/../notion-client.sh"
 
+task_storage_notion_status_map() {
+  local ready_val in_prog_val done_val
+  ready_val="$(_notion_ts_status_value "ready")"
+  in_prog_val="$(_notion_ts_status_value "in_progress")"
+  done_val="$(_notion_ts_status_value "done")"
+  jq -n \
+    --arg ready "$ready_val" \
+    --arg in_prog "$in_prog_val" \
+    --arg done_v "$done_val" \
+    '{($ready): "ready", ($in_prog): "in_progress", ($done_v): "done"}'
+}
+
 # Read the configured status property name, with fallback.
 _notion_ts_status_property() {
   local prop
