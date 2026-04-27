@@ -1,10 +1,8 @@
-# Claude Code local state
-.claude/*.local.md
-.claude/*.local.json
-.claude/plans/
-.claude/memory/
-.claude/worktrees/
-.claude/todos/
+# Claude Code local state — entire root .claude/ directory
+# (settings, settings.local, worktrees, plans, memory, todos, and any future
+# state files Claude Code introduces). Anchored at root so it does NOT match
+# nested .claude/ directories elsewhere in the tree.
+/.claude/
 
 # Autopilot state generated when the plugin is run from inside its own repo.
 # /tasks/ is anchored to the root so it does NOT match backlog/tasks/ which
