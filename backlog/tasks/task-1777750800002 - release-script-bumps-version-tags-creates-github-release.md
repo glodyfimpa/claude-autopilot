@@ -1,7 +1,7 @@
 ---
 id: TASK-1777750800002
 title: 'release script: bumps version, tags, creates GitHub release in one command'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 14:35'
 labels:
@@ -36,19 +36,19 @@ Optionally accept `--dry-run` to print every step without executing.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scripts/release.sh exists, executable, takes a version argument
-- [ ] #2 Refuses to run on a dirty working tree or a non-main branch
-- [ ] #3 Refuses to run if the target version is not greater than the current one
-- [ ] #4 Auto-updates README test count from the actual bats run
-- [ ] #5 Generates a draft changelog from git log between the previous tag and HEAD
-- [ ] #6 Opens $EDITOR for tag annotation refinement (skip with --no-edit)
-- [ ] #7 Pushes commit + tag, then creates the GitHub release with matching notes
-- [ ] #8 bats tests cover: argument validation, dirty tree refusal, version comparison, dry-run output
+- [x] #1 scripts/release.sh exists, executable, takes a version argument
+- [x] #2 Refuses to run on a dirty working tree or a non-main branch
+- [x] #3 Refuses to run if the target version is not greater than the current one
+- [x] #4 Auto-updates README test count from the actual bats run
+- [x] #5 Generates a draft changelog from git log between the previous tag and HEAD
+- [x] #6 Opens $EDITOR for tag annotation refinement (skip with --no-edit)
+- [x] #7 Pushes commit + tag, then creates the GitHub release with matching notes
+- [x] #8 bats tests cover: argument validation, dirty tree refusal, version comparison, dry-run output
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 All bats tests green
-- [ ] #2 Manual smoke test: run scripts/release.sh 0.7.0-test-rc1 in a throwaway worktree and confirm the full flow works end-to-end (dry-run is fine — no real GitHub release)
-- [ ] #3 README documents the script as the canonical release flow
+- [x] #1 All bats tests green
+- [x] #2 Manual smoke test: run scripts/release.sh 0.7.0-test-rc1 in a throwaway worktree and confirm the full flow works end-to-end (dry-run is fine — no real GitHub release)
+- [x] #3 README documents the script as the canonical release flow
 <!-- DOD:END -->
