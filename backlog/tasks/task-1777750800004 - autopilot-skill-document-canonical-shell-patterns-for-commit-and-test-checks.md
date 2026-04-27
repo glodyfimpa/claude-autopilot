@@ -1,7 +1,7 @@
 ---
 id: TASK-1777750800004
 title: 'autopilot skill: document canonical shell patterns for commit messages and test checks'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 14:35'
 labels:
@@ -30,14 +30,14 @@ These are doc-only changes — no code. They prevent re-discovery of known traps
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/autopilot/SKILL.md adds a "Shell pattern conventions" subsection
-- [ ] #2 The commit/PR-body pattern explicitly recommends `-F file` / `--body-file file` as default, not as fallback
-- [ ] #3 The bats grep pattern explicitly recommends `grep -c "^ok "` and warns against `grep -c "^not ok"`
-- [ ] #4 The subsection cites the v0.6.0 sprint as the case-study where both patterns were rediscovered manually
+- [x] #1 skills/autopilot/SKILL.md adds a "Shell pattern conventions" subsection
+- [x] #2 The commit/PR-body pattern explicitly recommends `-F file` / `--body-file file` as default, not as fallback
+- [x] #3 The bats grep pattern explicitly recommends `grep -c "^ok "` and warns against `grep -c "^not ok"`
+- [x] #4 The subsection cites the v0.6.0 sprint as the case-study where both patterns were rediscovered manually
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 No code changes — doc only
-- [ ] #2 Manual review: confirm the patterns match what already lives in the user's global CLAUDE.md (single source of truth)
+- [x] #1 No code changes — doc only
+- [x] #2 Manual review: confirm the patterns match what already lives in the user's global CLAUDE.md (single source of truth)
 <!-- DOD:END -->
