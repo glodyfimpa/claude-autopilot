@@ -119,7 +119,7 @@ recommendation="$(recommend_pr_strategy "$enriched_tasks_json")"
 
 Behavior:
 
-- **`hasOverlap == false`** → no warning, default to **(a) separate PRs**, jump to confirmation.
+- **`hasOverlap == false`** → no warning. Silently set strategy = **(a) separate PRs**. Do NOT prompt the user to pick a strategy. Proceed directly to the batch-spawn confirmation gate at the start of Step 6.
 - **`hasOverlap == true`** → show the user BOTH the file-overlap matrix and the metric-overlap matrix (same `{file/line, tasks}` format), then ask which PR strategy to use:
   - **(a) Separate PRs** — current behavior, one PR per task. Reviewer handles conflicts.
   - **(b) Bundled PR** (recommended when one overlap cluster covers all/most tasks, OR when only metric overlap is present) — all tasks run in their own worktree branches, then their commits are cherry-picked sequentially into a single integration branch (`integration/sprint-<timestamp>`); conflicts are resolved during integration; one PR is opened listing all tasks.
@@ -127,7 +127,11 @@ Behavior:
 
 `recommend_pr_strategy` returns `bundled` whenever file overlap is empty but metric overlap covers 2+ tasks — bundling avoids the cascading single-line conflicts. Use it as the default suggestion; the user can override.
 
-Ask for confirmation before spawning any work.
+When `hasOverlap == true` and the user has chosen a strategy, surface the chosen strategy together with the batch-spawn confirmation in Step 6 (single yes/no gate). The strategy choice itself is NOT a separate confirmation step.
+
+### Step 6: Batch-spawn confirmation gate
+
+Before any of Steps 6a–6d run, present a single yes/no prompt summarizing: number of tasks, plan strategy (sequential/parallel), PR strategy ((a)/(b)/(c)), integration branch name (if applicable). This is the **only** confirmation gate in the sprint flow — no earlier strategy/overlap prompt counts as confirmation. On `no`, stop without spawning any subagent or worktree.
 
 ### Step 6a: Sequential execution
 

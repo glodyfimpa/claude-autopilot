@@ -34,6 +34,13 @@ Backlog must be on main for the backlog provider to work across branches.
 - Execute ALL test plan items (including manual smoke tests) before declaring PR ready.
 - Every checklist item in the PR body must be checked before handoff — no unchecked items.
 
+## Direct-push exception (backlog-only)
+- Default rule: every commit goes via PR (see above). Never `git push origin main` directly.
+- Exception: a commit whose diff is **limited to `backlog/tasks/*.md`** may be committed and pushed straight to `main`. Covers status sync (To Do → In Progress → Done), new task file creation, and AC/body edits.
+- Boundary: if `git diff --name-only` shows ANY path outside `backlog/tasks/` (commands, lib, skills, tests, docs, README, plugin.json, .gitignore, anything), fall back to the PR flow.
+- Mixed diffs → split into two commits: one backlog-only direct-push, one feature PR.
+- Always verify with `git diff --name-only` before pushing.
+
 ## Worktrees
 Subagent worktrees can leak files into the main directory.
 After parallel runs: `git checkout -- . && git clean -fd <leaked-dirs> && git worktree prune`
