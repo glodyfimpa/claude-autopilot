@@ -52,6 +52,14 @@ setup_file() {
   CLONE_DIR="${BATS_FILE_TMPDIR:-${TMPDIR:-/tmp}}/claude-autopilot-realrepo-clone"
   rm -rf "$CLONE_DIR"
   git clone --quiet --depth=1 "file://$REAL_REPO_ROOT" "$CLONE_DIR"
+  # `git clone` inherits HEAD from the source repo's current branch. If the
+  # host is on a feature branch (anything other than main), the clone's HEAD
+  # is the feature branch, and release.sh's "must be on main" gate fails.
+  # Rename the cloned branch to `main` so the smoke test is robust regardless
+  # of the host branch. This was the v0.7.0 incident sibling: the 4 tests in
+  # this file passed in the subagent worktree (HEAD == main there) and failed
+  # whenever a developer ran them from a feature branch on the host.
+  git -C "$CLONE_DIR" branch -M main
   export CLONE_DIR
 
   # Build a `bats` stub that mimics a green run without actually executing
