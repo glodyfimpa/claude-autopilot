@@ -28,7 +28,7 @@ Add a `/autopilot-retro` slash command that automates the post-sprint retrospect
    - **Backlog task** (work item for the next sprint)
    - **Discard** (one-off, not worth capturing)
 4. After user confirms the classification, generate the .md files in the right place (`~/.claude/projects/<...>/memory/` or `backlog/tasks/`).
-5. If any backlog tasks were created, open a PR `chore/retro-vX.Y.Z` from `main` with the new task files (NEVER push directly).
+5. If any backlog tasks were created, commit them under `backlog/tasks/` and push directly to `main` (per the broadened backlog-direct-push exception confirmed 2026-04-28). Memory files go to the user's `~/.claude/.../memory/` directory and are NOT committed (personal scope).
 
 Important constraint: don't build this until at least 2 more manual retrospectives have happened — the design space is still open after only 1 data point. The v0.7.0 retro itself was the first; track subsequent ones as input.
 <!-- SECTION:DESCRIPTION:END -->
@@ -40,7 +40,7 @@ Important constraint: don't build this until at least 2 more manual retrospectiv
 - [ ] #3 Command proposes items with classification (memory / task / discard) for user review
 - [ ] #4 Generated memory files follow the existing `feedback_*.md` schema
 - [ ] #5 Generated backlog task files follow the existing `task-<timestamp> - <slug>.md` schema
-- [ ] #6 Command opens a PR `chore/retro-<tag>` for new task files; NEVER pushes to main directly
+- [ ] #6 Command commits new backlog task files under `backlog/tasks/` and pushes directly to `main` (per the backlog-direct-push exception); never touches non-backlog paths in the same commit
 - [ ] #7 At least 2 manual retros recorded as design input before implementation starts
 <!-- AC:END -->
 
