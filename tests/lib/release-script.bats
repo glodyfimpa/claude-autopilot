@@ -84,20 +84,12 @@ teardown() {
 }
 
 # ---------- dry-run output ----------
-
-@test "release.sh: dry-run prints planned actions without mutating state" {
-  run "$RELEASE_SCRIPT" "0.7.0" --dry-run --no-edit
-  [ "$status" -eq 0 ]
-  echo "$output" | grep -qi "0.7.0"
-  echo "$output" | grep -qi "dry"
-
-  # Files not modified.
-  grep -q '"version": "0.6.0"' .claude-plugin/plugin.json
-  grep -q "100 tests" README.md
-}
-
-@test "release.sh: dry-run includes changelog section" {
-  run "$RELEASE_SCRIPT" "0.7.0" --dry-run --no-edit
-  [ "$status" -eq 0 ]
-  echo "$output" | grep -qi "changelog\|changes since"
-}
+#
+# The dry-run happy-path tests previously here ("dry-run prints planned actions"
+# and "dry-run includes changelog section") were removed in favor of
+# tests/lib/release-script-realrepo.bats, which exercises the same paths
+# against a clone of the real repo. Those fixture-based tests were fragile by
+# design: they hard-coded "0.6.0" → "0.7.0" but release.sh reads plugin.json
+# from $PLUGIN_ROOT (the real repo), so every version bump on main turned the
+# version-comparison check into a false negative. See PR #28 "Out of scope"
+# note for the original flagging.
