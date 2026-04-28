@@ -1,7 +1,7 @@
 ---
 id: TASK-1777298431002
 title: 'autopilot-sprint: document grouped PR strategy semantics in sequential mode'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 16:00'
 labels:

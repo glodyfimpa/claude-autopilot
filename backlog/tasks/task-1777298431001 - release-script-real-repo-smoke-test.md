@@ -1,7 +1,7 @@
 ---
 id: TASK-1777298431001
 title: 'release script: add real-repo smoke test that catches dirty-tree on actual main'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 16:00'
 labels:
