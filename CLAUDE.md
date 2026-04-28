@@ -9,6 +9,7 @@ Bash scripts, bats tests, no Node/Python runtime.
 - Helpers: `tests/helpers/test_helper.bash` (tmpdir, fake git repo, assertions)
 - Always run full suite after rebase/merge conflict resolution before pushing
 - TDD: test first → RED → implement → GREEN → refactor
+- Smoke tests that clone the host repo via `git clone file://...`: rename the cloned branch to main with `git -C "$CLONE_DIR" branch -M main` after the clone. The clone inherits HEAD from the source repo's current branch, so without the rename, tests fail with "must be on main" from release.sh's branch-gate whenever the host is on a feature branch. See `tests/lib/release-script-realrepo.bats` setup_file and PR #31.
 
 ## Portability (CRITICAL)
 - Target: macOS bash 3.2 + BSD coreutils
