@@ -41,8 +41,12 @@ Important constraint: don't build this until at least 2 more manual retrospectiv
 - [ ] #4 Generated memory files follow the existing `feedback_*.md` schema
 - [ ] #5 Generated backlog task files follow the existing `task-<timestamp> - <slug>.md` schema
 - [ ] #6 Command commits new backlog task files under `backlog/tasks/` and pushes directly to `main` (per the backlog-direct-push exception); never touches non-backlog paths in the same commit
-- [ ] #7 At least 2 manual retros recorded as design input before implementation starts
+- [x] #7 At least 2 manual retros recorded as design input before implementation starts
 <!-- AC:END -->
+
+> **AC#7 satisfied (2026-04-28):**
+> 1. v0.7.0 release retro — captured in PR [#24](https://github.com/glodyfimpa/claude-autopilot/pull/24) (`chore(backlog): 2 follow-up tasks from v0.7.0 release retro`) which produced TASK-1777298431001, TASK-1777298431002, and this very task (TASK-1777298431003).
+> 2. v0.7.x follow-up sprint retro (this task's parent sprint) — captured in the assistant's structured retrospective on 2026-04-28 covering: the Step 5.1 confirmation slip, the auto-mode post-rationalization, the broadening of the backlog-direct-push exception, and the deliberate skip of TASK-1777298431003 itself for AC#7 compliance. Memory artifacts: [feedback_autopilot_sprint_no_extra_confirm.md](../../feedback_autopilot_sprint_no_extra_confirm.md), updated [feedback_no_direct_main_push.md](../../feedback_no_direct_main_push.md). Plugin commits from the same sprint: PRs [#27](https://github.com/glodyfimpa/claude-autopilot/pull/27), [#28](https://github.com/glodyfimpa/claude-autopilot/pull/28), and direct-push commits `ef9557d`, `5351c4f`.
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
