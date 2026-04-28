@@ -22,6 +22,19 @@ Execute the full batch of ready tasks end-to-end. The parallelization strategy c
 
 ## Actions
 
+### Strategy x execution-mode matrix
+
+The PR strategy chosen in Step 5.1 and the execution mode chosen by the planner (Step 4, possibly forced to `sequential` by Step 1.5) combine into six cases. Use this table to find the step that handles each one — behavior is deterministic regardless of which sub-Claude executes the sprint.
+
+| PR strategy | Execution mode | Handler |
+|---|---|---|
+| separate    | parallel   | [Step 6b](#step-6b-parallel-execution) — one subagent + one PR per task |
+| separate    | sequential | [Step 6a](#step-6a-sequential-execution) — one task at a time + one PR per task |
+| bundled     | parallel   | [Step 6c](#step-6c-bundled-or-grouped-pr-execution) — worktrees + cherry-pick into one integration branch |
+| bundled     | sequential | [Step 6d](#step-6d-bundled-or-grouped-pr-execution-sequential-mode) — sequential commits on one integration branch + one PR |
+| grouped     | parallel   | [Step 6c](#step-6c-bundled-or-grouped-pr-execution) — worktrees + cherry-pick per cluster |
+| grouped     | sequential | [Step 6d](#step-6d-bundled-or-grouped-pr-execution-sequential-mode) — sequential commits on per-cluster integration branches + N PRs |
+
 ### Step 1: Load libraries
 
 ```bash
@@ -137,6 +150,26 @@ When the chosen PR strategy is **(b) Bundled PR** or **(c) Grouped PRs**, the pe
 3. Clean up worktrees only after the integration step succeeds. If a cherry-pick fails irrecoverably, leave the source worktrees in place so the user can inspect.
 
 The bundled flow replicates the manual sequence used during the v0.4.0 sprint (PR #12), where 6 tasks touching `wizard.sh`, `mcp-detector.sh`, and `autopilot-task.md` were cherry-picked into one branch with conflicts resolved once.
+
+### Step 6d: Bundled or grouped PR execution (sequential mode)
+
+When the chosen PR strategy is **(b) Bundled PR** or **(c) Grouped PRs** AND the plan strategy is `sequential` (either because the planner returned `sequential` or because Step 1.5 forced it on older git), worktrees are not used. The bundle is built directly on a single integration branch by sequentially implementing each task on it. The per-task agent must NOT push or open its own PR.
+
+**Bundled + Sequential**:
+
+1. From `main`, create one integration branch: `integration/sprint-<timestamp>`. Check it out.
+2. For each task in plan order: run the same per-task logic as `/autopilot-task` (implement, run gates, commit) directly on the integration branch — no worktree, no separate per-task branch. Each task produces one commit on the integration branch. Stop the batch if any task fails gates after max iterations.
+3. After all tasks succeed, run the FULL test suite (`bats tests/lib/`) on the integration branch. If green, push and open ONE PR listing every bundled task with its acceptance criteria.
+
+**Grouped + Sequential**:
+
+1. Run `group_by_overlap` on the enriched task array to get the clusters.
+2. For each cluster (in order), repeat the bundled+sequential flow above with branch `integration/sprint-<timestamp>-group<N>` created from `main`. Each cluster produces ONE PR. N clusters = N PRs.
+3. Between clusters, return to `main` before creating the next integration branch so each cluster starts from a clean baseline.
+
+Conflicts cannot arise within a single integration branch in this mode (there is no cherry-pick step), but the same gate failures that would surface in parallel mode still apply per task. If a task fails gates, leave the integration branch in place so the user can inspect.
+
+This matrix gap was first encountered during the v0.7.0 follow-up sprint (2026-04-27): the user selected grouped PRs and the planner forced sequential mode. The original spec only covered grouped+parallel via cherry-pick (Step 6c), leaving sub-Claudes to improvise. Step 6d makes that combination explicit.
 
 ### Step 7: Summary
 
