@@ -192,6 +192,7 @@ task_storage_backlog_update_status() {
 }
 
 task_storage_backlog_list() {
+  local filter="${1:-}"
   if [[ ! -d "$BACKLOG_TASKS_DIR" ]]; then
     echo "[]"
     return 0
@@ -200,7 +201,14 @@ task_storage_backlog_list() {
   local f
   for f in "$BACKLOG_TASKS_DIR"/*.md; do
     [[ -f "$f" ]] || continue
-    items+=("$(_backlog_parse "$f")")
+    local parsed
+    parsed="$(_backlog_parse "$f")"
+    if [[ -n "$filter" ]]; then
+      local s
+      s="$(echo "$parsed" | jq -r '.status')"
+      [[ "$s" == "$filter" ]] || continue
+    fi
+    items+=("$parsed")
   done
   if [[ ${#items[@]} -eq 0 ]]; then
     echo "[]"

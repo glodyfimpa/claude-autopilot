@@ -174,6 +174,78 @@ _create_backlog_task() {
   assert_equal "[]" "$output"
 }
 
+@test "backlog list ready returns only To Do tasks" {
+  _create_backlog_task "task-1" "First-task"
+  _create_backlog_task "task-2" "Second-task"
+  # Mark task-2 as Done
+  sed -i.bak -e 's/^status: To Do/status: Done/' "backlog/tasks/task-2 - Second-task.md"
+  rm -f "backlog/tasks/task-2 - Second-task.md.bak"
+
+  run task_storage_list ready
+  [ "$status" -eq 0 ]
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "1" ]
+  local id
+  id="$(echo "$output" | jq -r '.[0].id')"
+  [ "$id" = "TASK-1" ]
+}
+
+@test "backlog list done returns only Done tasks" {
+  _create_backlog_task "task-1" "First-task"
+  _create_backlog_task "task-2" "Second-task"
+  sed -i.bak -e 's/^status: To Do/status: Done/' "backlog/tasks/task-2 - Second-task.md"
+  rm -f "backlog/tasks/task-2 - Second-task.md.bak"
+
+  run task_storage_list done
+  [ "$status" -eq 0 ]
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "1" ]
+  local id
+  id="$(echo "$output" | jq -r '.[0].id')"
+  [ "$id" = "TASK-2" ]
+}
+
+@test "backlog list in_progress returns only In Progress tasks" {
+  _create_backlog_task "task-1" "First-task"
+  _create_backlog_task "task-2" "Second-task"
+  sed -i.bak -e 's/^status: To Do/status: In Progress/' "backlog/tasks/task-1 - First-task.md"
+  rm -f "backlog/tasks/task-1 - First-task.md.bak"
+
+  run task_storage_list in_progress
+  [ "$status" -eq 0 ]
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "1" ]
+  local id
+  id="$(echo "$output" | jq -r '.[0].id')"
+  [ "$id" = "TASK-1" ]
+}
+
+@test "backlog list ready returns empty array when no ready tasks" {
+  _create_backlog_task "task-1" "First-task"
+  sed -i.bak -e 's/^status: To Do/status: Done/' "backlog/tasks/task-1 - First-task.md"
+  rm -f "backlog/tasks/task-1 - First-task.md.bak"
+
+  run task_storage_list ready
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+}
+
+@test "backlog list with empty filter returns all tasks (backward compat)" {
+  _create_backlog_task "task-1" "First-task"
+  _create_backlog_task "task-2" "Second-task"
+  sed -i.bak -e 's/^status: To Do/status: Done/' "backlog/tasks/task-2 - Second-task.md"
+  rm -f "backlog/tasks/task-2 - Second-task.md.bak"
+
+  run task_storage_list
+  [ "$status" -eq 0 ]
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "2" ]
+}
+
 # -------- create --------
 
 @test "backlog create writes a new task file under backlog/tasks" {
