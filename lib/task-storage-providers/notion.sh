@@ -204,6 +204,7 @@ task_storage_notion_create() {
 
 # List all tasks in the configured Notion database (optionally filtered by status).
 task_storage_notion_list() {
+  local filter_arg="${1:-}"
   local database_id
   database_id="$(config_get "notion.database_id" 2>/dev/null || true)"
   if [[ -z "$database_id" ]]; then
@@ -211,11 +212,21 @@ task_storage_notion_list() {
     return 1
   fi
 
-  local response
-  response="$(notion_client_query_database "$database_id")" || return 1
-
   local status_prop
   status_prop="$(_notion_ts_status_property)"
+
+  local notion_filter_json=""
+  if [[ -n "$filter_arg" ]]; then
+    local native
+    native="$(_notion_ts_status_value "$filter_arg")"
+    notion_filter_json="$(jq -nc \
+      --arg prop "$status_prop" \
+      --arg val "$native" \
+      '{property: $prop, status: {equals: $val}}')"
+  fi
+
+  local response
+  response="$(notion_client_query_database "$database_id" "$notion_filter_json")" || return 1
 
   local ready_val in_prog_val done_val
   ready_val="$(_notion_ts_status_value "ready")"

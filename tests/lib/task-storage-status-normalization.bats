@@ -169,3 +169,63 @@ teardown() {
   back="$(normalize_status_value notion "$native")"
   [ "$back" = "done" ]
 }
+
+# -------- list-with-filter round-trip --------
+
+@test "round-trip: create + list ready surfaces the new task" {
+  mkdir -p backlog/tasks
+  config_set "task_storage.provider" "backlog"
+
+  task_storage_create "New feature" "Build something" "AC1,AC2"
+
+  run task_storage_list ready
+  [ "$status" -eq 0 ]
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "1" ]
+}
+
+@test "round-trip: update_status to in_progress moves task between filters" {
+  mkdir -p backlog/tasks
+  config_set "task_storage.provider" "backlog"
+
+  task_storage_create "New feature" "Build" "AC1"
+  local id
+  id="$(task_storage_list ready | jq -r '.[0].id')"
+
+  task_storage_update_status "$id" "in_progress"
+
+  # No longer in ready
+  run task_storage_list ready
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+
+  # Now in in_progress
+  run task_storage_list in_progress
+  [ "$status" -eq 0 ]
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "1" ]
+}
+
+@test "round-trip: update_status to done moves task to done filter only" {
+  mkdir -p backlog/tasks
+  config_set "task_storage.provider" "backlog"
+
+  task_storage_create "New feature" "Build" "AC1"
+  local id
+  id="$(task_storage_list ready | jq -r '.[0].id')"
+
+  task_storage_update_status "$id" "done"
+
+  run task_storage_list ready
+  [ "$output" = "[]" ]
+
+  run task_storage_list in_progress
+  [ "$output" = "[]" ]
+
+  run task_storage_list done
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "1" ]
+}

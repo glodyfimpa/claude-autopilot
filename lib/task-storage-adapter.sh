@@ -43,7 +43,36 @@ _task_storage_dispatch() {
 task_storage_fetch()         { _task_storage_dispatch "fetch" "$@"; }
 task_storage_update_status() { _task_storage_dispatch "update_status" "$@"; }
 task_storage_create()        { _task_storage_dispatch "create" "$@"; }
-task_storage_list()          { _task_storage_dispatch "list" "$@"; }
+
+# Canonical status vocabulary accepted by task_storage_list.
+TASK_STORAGE_CANONICAL_STATUSES="ready in_progress done"
+
+# task_storage_list [<status>]
+#   Lists tasks from the configured provider, optionally filtered by canonical
+#   status. Validates arity (0 or 1 arg) and vocabulary in the adapter so each
+#   provider receives exactly one arg (filter or empty string).
+task_storage_list() {
+  local filter=""
+  case $# in
+    0) filter="" ;;
+    1) filter="$1" ;;
+    *) echo "task_storage_list: too many arguments (expected 0 or 1, got $#)" >&2
+       return 1 ;;
+  esac
+
+  if [[ -n "$filter" ]]; then
+    local valid=0 s
+    for s in $TASK_STORAGE_CANONICAL_STATUSES; do
+      [[ "$s" == "$filter" ]] && { valid=1; break; }
+    done
+    if [[ $valid -eq 0 ]]; then
+      echo "task_storage_list: invalid status '$filter' (expected: ready|in_progress|done)" >&2
+      return 1
+    fi
+  fi
+
+  _task_storage_dispatch "list" "$filter"
+}
 
 # Internal: load and call the status_map function for the given provider.
 # Echoes the map JSON. Empty output if the provider does not declare one.

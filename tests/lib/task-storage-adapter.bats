@@ -271,6 +271,58 @@ MOCK
   assert_equal "done" "$second_status"
 }
 
+@test "notion: task_storage_list ready passes status filter to query" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.database_id" "db-test-123"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.ready" "Ready"
+
+  local NOTION_CALLS_LOG="$BATS_TEST_TMPDIR/notion-calls.log"
+
+  notion_client_query_database() {
+    echo "NOTION_CALL: db=$1 filter=[$2]" >> "$NOTION_CALLS_LOG"
+    cat <<'JSON'
+{ "results": [] }
+JSON
+  }
+  export -f notion_client_query_database
+  export NOTION_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  grep -q '"property"' "$NOTION_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$NOTION_CALLS_LOG"; false)
+  grep -q '"status"' "$NOTION_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$NOTION_CALLS_LOG"; false)
+}
+
+@test "notion: task_storage_list with no filter passes empty filter arg" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.database_id" "db-test-123"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.ready" "Ready"
+
+  local NOTION_CALLS_LOG="$BATS_TEST_TMPDIR/notion-calls.log"
+
+  notion_client_query_database() {
+    echo "NOTION_CALL: db=$1 filter=[$2]" >> "$NOTION_CALLS_LOG"
+    cat <<'JSON'
+{ "results": [] }
+JSON
+  }
+  export -f notion_client_query_database
+  export NOTION_CALLS_LOG
+
+  run task_storage_list
+  assert_equal "0" "$status"
+
+  grep -q 'filter=\[\]' "$NOTION_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$NOTION_CALLS_LOG"; false)
+}
+
 # -------- task_storage_update_status --------
 
 @test "task_storage_update_status updates the status field in a local-file task" {
@@ -326,6 +378,91 @@ EOF
 ---
 id: b
 title: Second task
+status: done
+---
+body
+EOF
+  run task_storage_list
+  assert_equal "0" "$status"
+  local count
+  count="$(echo "$output" | jq 'length')"
+  assert_equal "2" "$count"
+}
+
+@test "task_storage_list ready returns only ready local-file tasks" {
+  config_init
+  config_set "task_storage.provider" "local-file"
+  mkdir -p tasks
+  cat > tasks/task-1.md <<'EOF'
+---
+id: task-1
+title: Ready task
+status: ready
+---
+body
+EOF
+  cat > tasks/task-2.md <<'EOF'
+---
+id: task-2
+title: Done task
+status: done
+---
+body
+EOF
+  run task_storage_list ready
+  assert_equal "0" "$status"
+  local count id
+  count="$(echo "$output" | jq 'length')"
+  assert_equal "1" "$count"
+  id="$(echo "$output" | jq -r '.[0].id')"
+  assert_equal "task-1" "$id"
+}
+
+@test "task_storage_list done returns only done local-file tasks" {
+  config_init
+  config_set "task_storage.provider" "local-file"
+  mkdir -p tasks
+  cat > tasks/task-1.md <<'EOF'
+---
+id: task-1
+title: Ready task
+status: ready
+---
+body
+EOF
+  cat > tasks/task-2.md <<'EOF'
+---
+id: task-2
+title: Done task
+status: done
+---
+body
+EOF
+  run task_storage_list done
+  assert_equal "0" "$status"
+  local count id
+  count="$(echo "$output" | jq 'length')"
+  assert_equal "1" "$count"
+  id="$(echo "$output" | jq -r '.[0].id')"
+  assert_equal "task-2" "$id"
+}
+
+@test "task_storage_list with empty filter returns all local-file tasks" {
+  config_init
+  config_set "task_storage.provider" "local-file"
+  mkdir -p tasks
+  cat > tasks/task-1.md <<'EOF'
+---
+id: task-1
+title: Ready task
+status: ready
+---
+body
+EOF
+  cat > tasks/task-2.md <<'EOF'
+---
+id: task-2
+title: Done task
 status: done
 ---
 body
@@ -452,6 +589,95 @@ MOCK
   assert_equal "done" "$second_status"
 }
 
+@test "jira: task_storage_list ready passes status filter into JQL" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+
+  local JIRA_CALLS_LOG="$BATS_TEST_TMPDIR/jira-calls.log"
+
+  jira_client_search_issues() {
+    echo "JIRA_CALL: project=$1 jql_extra=$2" >> "$JIRA_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f jira_client_search_issues
+  export JIRA_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  # The provider must pass the JQL clause WITHOUT a leading "AND" — the
+  # client adds the AND when joining. Otherwise we'd get "AND  AND status".
+  grep -q 'jql_extra=status = "To Do"' "$JIRA_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$JIRA_CALLS_LOG"; false)
+
+  # Also assert no leading whitespace before "status"
+  grep -vq 'jql_extra= status' "$JIRA_CALLS_LOG" \
+    || (echo "leading-space leak:"; cat "$JIRA_CALLS_LOG"; false)
+}
+
+@test "jira: task_storage_list ready produces well-formed JQL (no double AND)" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+
+  local JIRA_CALLS_LOG="$BATS_TEST_TMPDIR/jira-calls.log"
+
+  jira_client_search_issues() {
+    # Replicate the real client's jql construction so the test asserts on the
+    # final string, not on intermediate args.
+    local project_key="$1"
+    local jql_extra="${2:-}"
+    local jql="project = ${project_key}"
+    if [[ -n "$jql_extra" ]]; then
+      jql="${jql} AND ${jql_extra}"
+    fi
+    echo "FINAL_JQL: $jql" >> "$JIRA_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f jira_client_search_issues
+  export JIRA_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  # Must be: project = PROJ AND status = "To Do"
+  # NOT: project = PROJ AND  AND status = "To Do"
+  grep -q '^FINAL_JQL: project = .* AND status = "To Do"$' "$JIRA_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$JIRA_CALLS_LOG"; false)
+
+  # Negative assertion: no double AND
+  ! grep -q 'AND  AND' "$JIRA_CALLS_LOG" \
+    || (echo "double AND detected:"; cat "$JIRA_CALLS_LOG"; false)
+}
+
+@test "jira: task_storage_list with no filter passes empty jql_extra" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+
+  local JIRA_CALLS_LOG="$BATS_TEST_TMPDIR/jira-calls.log"
+
+  jira_client_search_issues() {
+    echo "JIRA_CALL: project=$1 jql_extra=[$2]" >> "$JIRA_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f jira_client_search_issues
+  export JIRA_CALLS_LOG
+
+  run task_storage_list
+  assert_equal "0" "$status"
+
+  grep -q 'jql_extra=\[\]' "$JIRA_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$JIRA_CALLS_LOG"; false)
+}
+
 # -------- Linear provider tests (mocked MCP calls) --------
 
 @test "linear: task_storage_fetch returns normalized task JSON" {
@@ -557,4 +783,54 @@ MOCK
   assert_equal "Task A" "$first_title"
   assert_equal "ready" "$first_status"
   assert_equal "done" "$second_status"
+}
+
+@test "linear: task_storage_list ready passes state filter into client call" {
+  config_init
+  config_set "task_storage.provider" "linear"
+  config_set "linear.team_id" "team-xyz"
+
+  local LINEAR_CALLS_LOG
+  LINEAR_CALLS_LOG="$(mktemp)"
+
+  linear_client_list_issues() {
+    echo "LINEAR_CALL: team=$1 state=$2" >> "$LINEAR_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f linear_client_list_issues
+  export LINEAR_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  grep -q 'LINEAR_CALL: team=' "$LINEAR_CALLS_LOG"
+  # state arg should be non-empty (the native name for ready)
+  grep -vq 'state=$' "$LINEAR_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$LINEAR_CALLS_LOG"; false)
+}
+
+@test "linear: task_storage_list with no filter passes empty state arg" {
+  config_init
+  config_set "task_storage.provider" "linear"
+  config_set "linear.team_id" "team-xyz"
+
+  local LINEAR_CALLS_LOG
+  LINEAR_CALLS_LOG="$(mktemp)"
+
+  linear_client_list_issues() {
+    echo "LINEAR_CALL: team=$1 state=[$2]" >> "$LINEAR_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f linear_client_list_issues
+  export LINEAR_CALLS_LOG
+
+  run task_storage_list
+  assert_equal "0" "$status"
+
+  grep -q 'state=\[\]' "$LINEAR_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$LINEAR_CALLS_LOG"; false)
 }
