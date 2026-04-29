@@ -556,9 +556,51 @@ JSON
   run task_storage_list ready
   assert_equal "0" "$status"
 
-  # _jira_ts_status_value "ready" returns "To Do" by default
-  grep -q 'jql_extra= AND status = "To Do"' "$JIRA_CALLS_LOG" \
+  # The provider must pass the JQL clause WITHOUT a leading "AND" — the
+  # client adds the AND when joining. Otherwise we'd get "AND  AND status".
+  grep -q 'jql_extra=status = "To Do"' "$JIRA_CALLS_LOG" \
     || (echo "captured calls:"; cat "$JIRA_CALLS_LOG"; false)
+
+  # Also assert no leading whitespace before "status"
+  grep -vq 'jql_extra= status' "$JIRA_CALLS_LOG" \
+    || (echo "leading-space leak:"; cat "$JIRA_CALLS_LOG"; false)
+}
+
+@test "jira: task_storage_list ready produces well-formed JQL (no double AND)" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+
+  local JIRA_CALLS_LOG="$BATS_TEST_TMPDIR/jira-calls.log"
+
+  jira_client_search_issues() {
+    # Replicate the real client's jql construction so the test asserts on the
+    # final string, not on intermediate args.
+    local project_key="$1"
+    local jql_extra="${2:-}"
+    local jql="project = ${project_key}"
+    if [[ -n "$jql_extra" ]]; then
+      jql="${jql} AND ${jql_extra}"
+    fi
+    echo "FINAL_JQL: $jql" >> "$JIRA_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f jira_client_search_issues
+  export JIRA_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  # Must be: project = PROJ AND status = "To Do"
+  # NOT: project = PROJ AND  AND status = "To Do"
+  grep -q '^FINAL_JQL: project = .* AND status = "To Do"$' "$JIRA_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$JIRA_CALLS_LOG"; false)
+
+  # Negative assertion: no double AND
+  ! grep -q 'AND  AND' "$JIRA_CALLS_LOG" \
+    || (echo "double AND detected:"; cat "$JIRA_CALLS_LOG"; false)
 }
 
 @test "jira: task_storage_list with no filter passes empty jql_extra" {

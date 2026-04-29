@@ -203,7 +203,7 @@ task_storage_jira_list() {
   if [[ -n "$filter" ]]; then
     local native
     native="$(_jira_ts_status_value "$filter")"
-    jql_extra=" AND status = \"$native\""
+    jql_extra="status = \"$native\""
   fi
 
   local response
