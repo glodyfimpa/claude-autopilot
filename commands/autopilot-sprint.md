@@ -74,7 +74,7 @@ A missing/unparseable git binary (status 2) is fatal — autopilot needs git.
 
 ### Step 2: List ready tasks
 
-Run `task_storage_list` and filter to tasks with status `ready`. If zero tasks are returned, stop and tell the user the queue is empty.
+Run `task_storage_list ready`. The adapter validates the canonical status (`ready | in_progress | done`) and the provider applies the filter natively (jq for local providers, JQL / Notion filter / GraphQL filter for remote). If zero tasks are returned, stop and tell the user the queue is empty.
 
 ### Step 3: Estimate complexity for every task
 
