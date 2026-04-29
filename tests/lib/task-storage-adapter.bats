@@ -337,6 +337,91 @@ EOF
   assert_equal "2" "$count"
 }
 
+@test "task_storage_list ready returns only ready local-file tasks" {
+  config_init
+  config_set "task_storage.provider" "local-file"
+  mkdir -p tasks
+  cat > tasks/task-1.md <<'EOF'
+---
+id: task-1
+title: Ready task
+status: ready
+---
+body
+EOF
+  cat > tasks/task-2.md <<'EOF'
+---
+id: task-2
+title: Done task
+status: done
+---
+body
+EOF
+  run task_storage_list ready
+  assert_equal "0" "$status"
+  local count id
+  count="$(echo "$output" | jq 'length')"
+  assert_equal "1" "$count"
+  id="$(echo "$output" | jq -r '.[0].id')"
+  assert_equal "task-1" "$id"
+}
+
+@test "task_storage_list done returns only done local-file tasks" {
+  config_init
+  config_set "task_storage.provider" "local-file"
+  mkdir -p tasks
+  cat > tasks/task-1.md <<'EOF'
+---
+id: task-1
+title: Ready task
+status: ready
+---
+body
+EOF
+  cat > tasks/task-2.md <<'EOF'
+---
+id: task-2
+title: Done task
+status: done
+---
+body
+EOF
+  run task_storage_list done
+  assert_equal "0" "$status"
+  local count id
+  count="$(echo "$output" | jq 'length')"
+  assert_equal "1" "$count"
+  id="$(echo "$output" | jq -r '.[0].id')"
+  assert_equal "task-2" "$id"
+}
+
+@test "task_storage_list with empty filter returns all local-file tasks" {
+  config_init
+  config_set "task_storage.provider" "local-file"
+  mkdir -p tasks
+  cat > tasks/task-1.md <<'EOF'
+---
+id: task-1
+title: Ready task
+status: ready
+---
+body
+EOF
+  cat > tasks/task-2.md <<'EOF'
+---
+id: task-2
+title: Done task
+status: done
+---
+body
+EOF
+  run task_storage_list
+  assert_equal "0" "$status"
+  local count
+  count="$(echo "$output" | jq 'length')"
+  assert_equal "2" "$count"
+}
+
 # -------- Jira provider tests (mocked MCP calls) --------
 
 @test "jira: task_storage_fetch returns normalized task JSON" {

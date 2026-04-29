@@ -91,6 +91,7 @@ task_storage_local_file_create() {
 # List all task files in the tasks/ directory and return them as a JSON array
 # of fetched task objects.
 task_storage_local_file_list() {
+  local filter="${1:-}"
   if [[ ! -d "$TASK_STORAGE_LOCAL_DIR" ]]; then
     echo "[]"
     return 0
@@ -99,7 +100,14 @@ task_storage_local_file_list() {
   local f
   for f in "$TASK_STORAGE_LOCAL_DIR"/*.md; do
     [[ -f "$f" ]] || continue
-    items+=("$(_task_storage_local_file_parse "$f")")
+    local parsed
+    parsed="$(_task_storage_local_file_parse "$f")"
+    if [[ -n "$filter" ]]; then
+      local s
+      s="$(echo "$parsed" | jq -r '.status')"
+      [[ "$s" == "$filter" ]] || continue
+    fi
+    items+=("$parsed")
   done
   if [[ ${#items[@]} -eq 0 ]]; then
     echo "[]"
