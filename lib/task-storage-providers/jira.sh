@@ -191,6 +191,7 @@ task_storage_jira_create() {
 
 # List all issues in the configured Jira project.
 task_storage_jira_list() {
+  local filter="${1:-}"
   local project_key
   project_key="$(config_get "jira.project_key" 2>/dev/null || true)"
   if [[ -z "$project_key" ]]; then
@@ -198,8 +199,15 @@ task_storage_jira_list() {
     return 1
   fi
 
+  local jql_extra=""
+  if [[ -n "$filter" ]]; then
+    local native
+    native="$(_jira_ts_status_value "$filter")"
+    jql_extra=" AND status = \"$native\""
+  fi
+
   local response
-  response="$(jira_client_search_issues "$project_key")" || return 1
+  response="$(jira_client_search_issues "$project_key" "$jql_extra")" || return 1
 
   local ready_val in_prog_val done_val
   ready_val="$(_jira_ts_status_value "ready")"

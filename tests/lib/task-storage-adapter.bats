@@ -537,6 +537,53 @@ MOCK
   assert_equal "done" "$second_status"
 }
 
+@test "jira: task_storage_list ready passes status filter into JQL" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+
+  local JIRA_CALLS_LOG="$BATS_TEST_TMPDIR/jira-calls.log"
+
+  jira_client_search_issues() {
+    echo "JIRA_CALL: project=$1 jql_extra=$2" >> "$JIRA_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f jira_client_search_issues
+  export JIRA_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  # _jira_ts_status_value "ready" returns "To Do" by default
+  grep -q 'jql_extra= AND status = "To Do"' "$JIRA_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$JIRA_CALLS_LOG"; false)
+}
+
+@test "jira: task_storage_list with no filter passes empty jql_extra" {
+  config_init
+  config_set "task_storage.provider" "jira"
+  config_set "jira.project_key" "PROJ"
+
+  local JIRA_CALLS_LOG="$BATS_TEST_TMPDIR/jira-calls.log"
+
+  jira_client_search_issues() {
+    echo "JIRA_CALL: project=$1 jql_extra=[$2]" >> "$JIRA_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f jira_client_search_issues
+  export JIRA_CALLS_LOG
+
+  run task_storage_list
+  assert_equal "0" "$status"
+
+  grep -q 'jql_extra=\[\]' "$JIRA_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$JIRA_CALLS_LOG"; false)
+}
+
 # -------- Linear provider tests (mocked MCP calls) --------
 
 @test "linear: task_storage_fetch returns normalized task JSON" {
