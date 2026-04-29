@@ -233,6 +233,22 @@ _create_backlog_task() {
   [ "$output" = "[]" ]
 }
 
+@test "backlog list ready includes tasks with Draft status (canonicalized)" {
+  _create_backlog_task "task-1" "First-task"
+  # Mark task-1 as Draft (the status_map says Draft canonicalizes to ready)
+  sed -i.bak -e 's/^status: To Do/status: Draft/' "backlog/tasks/task-1 - First-task.md"
+  rm -f "backlog/tasks/task-1 - First-task.md.bak"
+
+  run task_storage_list ready
+  [ "$status" -eq 0 ]
+  local count
+  count="$(echo "$output" | jq 'length')"
+  [ "$count" = "1" ]
+  local s
+  s="$(echo "$output" | jq -r '.[0].status')"
+  [ "$s" = "ready" ]
+}
+
 @test "backlog list with empty filter returns all tasks (backward compat)" {
   _create_backlog_task "task-1" "First-task"
   _create_backlog_task "task-2" "Second-task"

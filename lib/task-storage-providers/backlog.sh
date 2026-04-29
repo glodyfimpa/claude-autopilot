@@ -36,10 +36,10 @@ _backlog_status_to_display() {
 # Map Backlog.md display names to normalized internal names
 _backlog_status_to_normalized() {
   case "$1" in
-    "To Do")       echo "ready";;
-    "In Progress") echo "in_progress";;
-    "Done")        echo "done";;
-    *)             echo "$1";;
+    "To Do"|"Draft") echo "ready";;
+    "In Progress")   echo "in_progress";;
+    "Done")          echo "done";;
+    *)               echo "$1";;
   esac
 }
 
