@@ -186,6 +186,7 @@ task_storage_linear_create() {
 
 # List all issues in the configured Linear team.
 task_storage_linear_list() {
+  local filter="${1:-}"
   local team_id
   team_id="$(config_get "linear.team_id" 2>/dev/null || true)"
   if [[ -z "$team_id" ]]; then
@@ -193,8 +194,13 @@ task_storage_linear_list() {
     return 1
   fi
 
+  local native_state=""
+  if [[ -n "$filter" ]]; then
+    native_state="$(_linear_ts_status_value "$filter")"
+  fi
+
   local response
-  response="$(linear_client_list_issues "$team_id")" || return 1
+  response="$(linear_client_list_issues "$team_id" "$native_state")" || return 1
 
   local ready_val in_prog_val done_val
   ready_val="$(_linear_ts_status_value "ready")"

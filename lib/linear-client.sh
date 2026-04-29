@@ -68,17 +68,23 @@ linear_client_update_state() {
 }
 fi
 
-# List Linear issues for a team. Prints results JSON on stdout.
-# Usage: linear_client_list_issues <team_id>
+# List Linear issues for a team, optionally filtered by state name.
+# Usage: linear_client_list_issues <team_id> [state_name]
 if ! declare -f linear_client_list_issues >/dev/null 2>&1; then
 linear_client_list_issues() {
   local team_id="$1"
+  local state_name="${2:-}"
   if [[ -z "$team_id" ]]; then
     echo "linear_client_list_issues: team_id is required" >&2
     return 1
   fi
   local args
-  args="$(jq -nc --arg team "$team_id" '{teamId: $team}')"
+  if [[ -n "$state_name" ]]; then
+    args="$(jq -nc --arg team "$team_id" --arg state "$state_name" \
+      '{teamId: $team, filter: {state: {name: {eq: $state}}}}')"
+  else
+    args="$(jq -nc --arg team "$team_id" '{teamId: $team}')"
+  fi
   echo "__MCP_CALL__:mcp__linear__list_issues:${args}"
 }
 fi

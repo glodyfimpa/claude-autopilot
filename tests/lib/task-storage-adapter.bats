@@ -784,3 +784,53 @@ MOCK
   assert_equal "ready" "$first_status"
   assert_equal "done" "$second_status"
 }
+
+@test "linear: task_storage_list ready passes state filter into client call" {
+  config_init
+  config_set "task_storage.provider" "linear"
+  config_set "linear.team_id" "team-xyz"
+
+  local LINEAR_CALLS_LOG
+  LINEAR_CALLS_LOG="$(mktemp)"
+
+  linear_client_list_issues() {
+    echo "LINEAR_CALL: team=$1 state=$2" >> "$LINEAR_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f linear_client_list_issues
+  export LINEAR_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  grep -q 'LINEAR_CALL: team=' "$LINEAR_CALLS_LOG"
+  # state arg should be non-empty (the native name for ready)
+  grep -vq 'state=$' "$LINEAR_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$LINEAR_CALLS_LOG"; false)
+}
+
+@test "linear: task_storage_list with no filter passes empty state arg" {
+  config_init
+  config_set "task_storage.provider" "linear"
+  config_set "linear.team_id" "team-xyz"
+
+  local LINEAR_CALLS_LOG
+  LINEAR_CALLS_LOG="$(mktemp)"
+
+  linear_client_list_issues() {
+    echo "LINEAR_CALL: team=$1 state=[$2]" >> "$LINEAR_CALLS_LOG"
+    cat <<'JSON'
+{ "issues": [] }
+JSON
+  }
+  export -f linear_client_list_issues
+  export LINEAR_CALLS_LOG
+
+  run task_storage_list
+  assert_equal "0" "$status"
+
+  grep -q 'state=\[\]' "$LINEAR_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$LINEAR_CALLS_LOG"; false)
+}
