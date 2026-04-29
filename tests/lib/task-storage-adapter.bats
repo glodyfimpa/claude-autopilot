@@ -271,6 +271,58 @@ MOCK
   assert_equal "done" "$second_status"
 }
 
+@test "notion: task_storage_list ready passes status filter to query" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.database_id" "db-test-123"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.ready" "Ready"
+
+  local NOTION_CALLS_LOG="$BATS_TEST_TMPDIR/notion-calls.log"
+
+  notion_client_query_database() {
+    echo "NOTION_CALL: db=$1 filter=[$2]" >> "$NOTION_CALLS_LOG"
+    cat <<'JSON'
+{ "results": [] }
+JSON
+  }
+  export -f notion_client_query_database
+  export NOTION_CALLS_LOG
+
+  run task_storage_list ready
+  assert_equal "0" "$status"
+
+  grep -q '"property"' "$NOTION_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$NOTION_CALLS_LOG"; false)
+  grep -q '"status"' "$NOTION_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$NOTION_CALLS_LOG"; false)
+}
+
+@test "notion: task_storage_list with no filter passes empty filter arg" {
+  config_init
+  config_set "task_storage.provider" "notion"
+  config_set "notion.database_id" "db-test-123"
+  config_set "notion.status_property" "Status"
+  config_set "notion.status_values.ready" "Ready"
+
+  local NOTION_CALLS_LOG="$BATS_TEST_TMPDIR/notion-calls.log"
+
+  notion_client_query_database() {
+    echo "NOTION_CALL: db=$1 filter=[$2]" >> "$NOTION_CALLS_LOG"
+    cat <<'JSON'
+{ "results": [] }
+JSON
+  }
+  export -f notion_client_query_database
+  export NOTION_CALLS_LOG
+
+  run task_storage_list
+  assert_equal "0" "$status"
+
+  grep -q 'filter=\[\]' "$NOTION_CALLS_LOG" \
+    || (echo "captured calls:"; cat "$NOTION_CALLS_LOG"; false)
+}
+
 # -------- task_storage_update_status --------
 
 @test "task_storage_update_status updates the status field in a local-file task" {
