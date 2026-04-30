@@ -135,7 +135,39 @@ Before any of Steps 6a–6d run, present a single yes/no prompt summarizing: num
 
 ### Step 6a: Sequential execution
 
-When the plan strategy is `sequential`, iterate the groups in order and run each task through `/autopilot-task <ref>` one after another. Stop the batch if any task fails gates after max iterations.
+When the plan strategy is `sequential` and the chosen PR strategy is **(a) Separate PRs**, iterate the groups in order and spawn one isolated subagent per task using the `Agent` tool with `isolation: "worktree"`. Same dispatch pattern as Step 6b (parallel) — the only difference is **maxConcurrency = 1**, so the controller dispatches the next subagent only after the previous one has finished.
+
+Do NOT recursively invoke `/autopilot-task <ref>` from inside the same session. The recursive invocation pattern (used in earlier versions) inherits the controller's full session context across tasks, which leaks state from task N into task N+1. The fresh-subagent pattern matches Step 6b's architecture and the discipline confirmed by the 2026-04-29 fix sprint (11 isolated subagents, zero cross-task drift, two real bugs caught at per-task review).
+
+**Per-task subagent prompt** — the controller curates each subagent's prompt from this template:
+
+```
+You are an autopilot implementer subagent for ONE task. Run the inner-loop
+defined in the `autopilot` skill (`skills/autopilot/SKILL.md`) and stop at
+the task-complete marker. Do NOT push and do NOT open a PR — that is the
+controller's job.
+
+Task ref: <id>
+Title: <title>
+Description: <description verbatim>
+Acceptance criteria: <numbered list verbatim>
+Complexity tier: <tier>  # determines whether TDD strict applies
+
+Project conventions:
+- bash 3.2 + BSD coreutils (macOS) — NO bash 4+ syntax, NO declare -A,
+  NO mapfile, sed -i needs a suffix.
+- Tests: bats-core. Run `bats tests/lib/` for the full suite.
+- Worktree path: <absolute path injected by the Agent tool>.
+
+When done, write the marker file `~/.claude/.autopilot-task-complete` and
+return a structured summary: files changed, commit hash, gate results.
+```
+
+The controller waits for each subagent to complete before dispatching the next. If a subagent fails the inner-loop gates after max iterations (defined by the skill), STOP the batch and report the failure — do not dispatch the next task. Failed tasks remain in `in_progress` status so the user can resume them with `/autopilot-task <ref>` after fixing the blocker.
+
+**Parity with Step 6b.** Sequential and parallel modes share the same per-task contract: one Agent tool invocation, one worktree, one commit, no push, no PR. The only difference is the dispatch concurrency — `maxConcurrency = 1` for sequential, `maxConcurrency = plan.maxConcurrency` for parallel. This parity simplifies reasoning about the sprint flow: whether tasks run one at a time or in fan-out, the per-task agent looks the same.
+
+**Worktree cleanup.** After each subagent completes (success or failure), the controller cleans up the worktree following the standard pattern: `cd <main repo>` → `git worktree remove <path>` (or `rm -rf <path> && git worktree prune` on git < 2.17). The integration branch (or per-task branches in (a) Separate PRs) keeps the commits.
 
 ### Step 6b: Parallel execution
 
