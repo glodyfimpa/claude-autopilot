@@ -192,7 +192,7 @@ The motivation: PRs were repeatedly handed off with unchecked test plan items th
    - Every manual item stays `- [ ] <text>` with an inline `_(manual review)_` annotation.
 6. Update the PR with `gh pr edit <pr-number> --body-file <new-body-file>`.
 7. If any executable item failed: surface the failure to the user, roll the task status back to `in_progress` via `task_storage_update_status "$ARGUMENTS" "in_progress"`, and STOP. Do NOT proceed to Step 9.
-8. If at least one item is `_(manual review)_`, tell the user the task is `done pending manual review` and pause for confirmation before Step 9. Manual items can be acknowledged with a single user reply.
+8. If at least one item is `_(manual review)_`, mark the task as `done pending manual review` in the PR body but proceed to Step 9. Auto-mode does NOT pause for confirmation — manual items are surfaced in the PR description for the reviewer to verify at PR review time, not via mid-flight prompt. The PR body's `## Manual review needed` section documents what the reviewer must check before merging.
 
 #### What counts as "passing"
 
