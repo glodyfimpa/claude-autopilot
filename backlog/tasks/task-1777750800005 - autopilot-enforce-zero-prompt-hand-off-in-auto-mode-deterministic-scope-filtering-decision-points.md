@@ -3,9 +3,10 @@ id: TASK-1777750800005
 title: >-
   autopilot: enforce zero-prompt hand-off in auto-mode (deterministic scope
   filtering + decision points)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-04-30 11:38'
+updated_date: '2026-04-30 11:42'
 labels:
   - enhancement
   - command
