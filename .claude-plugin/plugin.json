@@ -1,6 +1,6 @@
 {
   "name": "claude-autopilot",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Autonomous PRD-to-PR pipeline with quality gates, code quality scanning, CI watchdog, and tool-agnostic adapters for Notion, Jira, Linear, GitHub, GitLab, Bitbucket. Inspired by Echofold's autonomous development pipeline.",
   "author": {
     "name": "Glody Fimpa"
