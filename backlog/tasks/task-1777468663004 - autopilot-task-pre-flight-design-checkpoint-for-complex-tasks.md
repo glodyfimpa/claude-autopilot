@@ -1,10 +1,10 @@
 ---
 id: TASK-1777468663004
 title: 'autopilot-task: pre-flight design checkpoint for complex tasks'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-29 13:30'
-updated_date: '2026-04-30 11:35'
+updated_date: '2026-04-30 13:42'
 labels:
   - enhancement
   - command
@@ -43,6 +43,12 @@ Depends on the existing `complexity-estimator.sh` output (no new code in lib/).
 - [ ] #6 The checkpoint NEVER triggers for `standard` or `simple` tier tasks (autopilot's speed is preserved for the common case)
 - [ ] #7 If `superpowers` is not installed, the checkpoint silently degrades: shows a one-line warning ("brainstorming skill not available, proceeding") and continues
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented in PR #36 (commit e0f170d). `/autopilot-task` Step 3.5 now scans `complex|epic` tasks for design-ambiguity signals and resolves them deterministically via a tie-breaker chain (existing pattern → portability → smaller diff → first-listed option). Each resolved ambiguity is documented in the PR body's `## Design ambiguities resolved` table for post-hoc review. AC reinterpretation: original spec called for a yes/no prompt; this conflicted with TASK-1777750800005 (zero-prompt hand-off, also added to this sprint). Resolved via deterministic resolution + PR-body documentation instead of mid-flight prompt. Step 3 (Estimate complexity) also rewritten to remove its prompts (epic tier no longer stops; surfaces a "Complexity reassessment" note in PR body recommending a follow-up split). Reinterpretation explicitly documented in commit message and PR body for reviewer attention. Approved by user.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

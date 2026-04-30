@@ -1,10 +1,10 @@
 ---
 id: TASK-1777468663001
 title: 'skill autopilot: TDD strict step in the inner loop'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-29 13:30'
-updated_date: '2026-04-30 11:34'
+updated_date: '2026-04-30 13:41'
 labels:
   - enhancement
   - skill
@@ -39,6 +39,12 @@ The change is markdown-only (no shell code touched). Cost is small, value is lar
 - [ ] #4 The IMPLEMENT step in the inner loop is updated to call out test-first explicitly when in TDD-strict mode
 - [ ] #5 Manual smoke: a `complex` task implemented through `/autopilot-task` produces commits where the test commit precedes (or is co-located with) the implementation commit, verified by reading `git log` after a real run
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented in PR #36 (commit b6aa3ce). The autopilot inner loop now requires TDD strict (RED → GREEN → REFACTOR → COMMIT per logical unit) for tasks at `complex` or `epic` complexity tier. For `standard` and `simple` tier the previous flexibility is preserved. The gate is the existing `estimate_complexity` output (no new config flag). Added doc-only/markdown-only edge case and "complexity reassessment" escape hatch for misclassified tasks.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

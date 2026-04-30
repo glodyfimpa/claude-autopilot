@@ -3,10 +3,10 @@ id: TASK-1777750800005
 title: >-
   autopilot: enforce zero-prompt hand-off in auto-mode (deterministic scope
   filtering + decision points)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-30 11:38'
-updated_date: '2026-04-30 11:42'
+updated_date: '2026-04-30 13:42'
 labels:
   - enhancement
   - command
@@ -59,3 +59,9 @@ Why now: the v0.7.1 sprint surfaced exactly this gap — the controller asked th
 - [ ] #7 Smoke test: a backlog containing one Rule-A task and one Rule-B task is filtered automatically, the sprint runs only on the remaining tasks, the final PR description lists the two exclusions with reasons.
 - [ ] #8 Zero new prompts introduced. Existing prompts in non-autopilot paths (e.g. /autopilot-configure wizard) are unchanged — the rule applies only to the four hands-off commands.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented in PR #36 (commit 690c913). New `lib/scope-filter.sh` (157 lines) implements deterministic scope filtering with rules A (precondition unmet), B (deliverable on external repo), C (broken dependency graph), D reserved. 9 bats tests at `tests/lib/scope-filter.bats` cover positive+negative for each rule, mixed input, empty input, reason text quality. `commands/autopilot-sprint.md` adds Step 3.5 that calls `scope_filter_apply`, rewrites Step 6 from "confirmation gate" (yes/no prompt) to "decision point" (declare and proceed), and Step 7 prints both executed and excluded tasks. Step 5.1 takes `recommend_pr_strategy` output as authoritative on `hasOverlap=true` instead of asking. `commands/autopilot-task.md` Step 8.6 manual-review item no longer pauses for confirmation. Token-budget cap converted from prompt to log+proceed. README has new "Hand-off contract — zero prompts in auto-mode" subsection with rule table. Smoke test: `scope_filter_apply` correctly excludes the two tasks the controller asked about at sprint start (TASK-1.9 rule=B; TASK-1777298431003 rule=A). 409 ok / 0 not ok on full bats suite.
+<!-- SECTION:FINAL_SUMMARY:END -->

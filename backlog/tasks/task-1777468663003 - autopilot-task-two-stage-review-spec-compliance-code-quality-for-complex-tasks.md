@@ -3,10 +3,10 @@ id: TASK-1777468663003
 title: >-
   autopilot-task: two-stage review (spec compliance + code quality) for complex
   tasks
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-29 13:30'
-updated_date: '2026-04-30 11:35'
+updated_date: '2026-04-30 13:42'
 labels:
   - enhancement
   - command
@@ -43,6 +43,12 @@ Depends on TASK-1777468663001 (TDD strict step) — the per-step review only mak
 - [ ] #6 Manual smoke: a `complex` task that includes an intentional acceptance-criterion mismatch is rejected by the spec reviewer until fixed
 - [ ] #7 PR description documents the per-step review trace (which reviewer flagged what, how many iterations)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented in PR #36 (commit 06ba9be). `/autopilot-task` now has Step 6.5 — a per-commit two-stage review loop that runs ONLY for `complex` and `epic` tier tasks. Two reviewer subagents in parallel: spec-compliance (vs AC) and code-quality (portability/coupling/error-handling/test-design). Implementer proceeds only on dual APPROVE; bounded to 3 iterations per commit before deadlock signaling. For `standard`/`simple` tier the step is silently skipped. Two new prompt templates committed at `skills/autopilot/{spec-compliance,code-quality}-reviewer-prompt.md`.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

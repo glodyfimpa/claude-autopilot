@@ -1,10 +1,10 @@
 ---
 id: TASK-1777468663002
 title: 'autopilot-sprint: fresh subagent per task in sequential mode'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-29 13:30'
-updated_date: '2026-04-30 11:34'
+updated_date: '2026-04-30 13:41'
 labels:
   - enhancement
   - command
@@ -36,6 +36,12 @@ The provider abstraction, complexity estimation, file-overlap detection, and qua
 - [ ] #5 No regression in `tests/lib/autopilot-sprint*.bats` (existing tests should still pass; new tests may be needed for the dispatch change)
 - [ ] #6 Document the parity between sequential and parallel subagent models in the command file so future readers see they share the same pattern
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented in PR #36 (commit f83cd20). `/autopilot-sprint` Step 6a now spawns one isolated subagent per task via the `Agent` tool with `isolation: "worktree"`, matching Step 6b's parallel architecture. Only difference between sequential and parallel modes is dispatch concurrency (maxConcurrency=1 vs plan.maxConcurrency). Per-task contract is identical: one Agent invocation, one worktree, one commit, no push, no PR. Documented curated prompt template, failure behavior, worktree cleanup pattern.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
