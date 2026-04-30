@@ -85,6 +85,27 @@ Invoke the autopilot skill (from `skills/autopilot/SKILL.md`) with the task desc
 
 Do NOT open a PR mid-loop. The PR comes only after the task-complete marker is set.
 
+#### Step 6.5: Per-step review (complex / epic only)
+
+When the task complexity tier is `complex` or `epic`, after EACH commit produced inside the inner loop (one per logical unit, per the TDD discipline section of the autopilot skill), run BOTH reviewers in parallel before the implementer proceeds to the next unit:
+
+- **Spec-compliance reviewer** (prompt: `skills/autopilot/spec-compliance-reviewer-prompt.md`) — validates the commit against the task's acceptance criteria, flags drift and out-of-scope changes.
+- **Code-quality reviewer** (prompt: `skills/autopilot/code-quality-reviewer-prompt.md`) — validates the commit for portability (bash 3.2 / BSD), hidden coupling, error-handling, and test design.
+
+The implementer proceeds to the next unit ONLY when both reviewers return APPROVE on the same commit. If either rejects:
+
+1. The implementer reads BOTH reports, fixes the issues (in a follow-up commit OR an amend depending on the issue's locality), and requests a re-review.
+2. Re-review loop is bounded: if 3 iterations on the same commit still don't reach APPROVE on both, STOP and report the deadlock. The deadlock signal usually means the AC is malformed or the design needs a brainstorming checkpoint (see Step 3.5 once it lands via TASK-1777468663004).
+
+Each reviewer subagent receives:
+- The diff of the latest commit (`git show <sha>` output).
+- The task's acceptance criteria verbatim from the task storage.
+- The project conventions (bash 3.2, BSD sed, bats-core).
+
+The PR description must document the per-step review trace: which reviewer flagged which issue, how many iterations were needed before APPROVE. Use a `## Review trace` section with one row per commit.
+
+For `standard` and `simple` tier tasks, this step is **silently skipped** — the inner loop runs through to Step 7 with the existing single-pass review at the end (code-simplifier + security-reviewer per the skill's Step 9). Per-step review on trivial changes adds latency without value.
+
 ### Step 7: Commit and push
 
 When the task-complete marker is set:
