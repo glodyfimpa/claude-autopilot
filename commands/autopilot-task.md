@@ -47,7 +47,34 @@ Run `task_storage_fetch "$ARGUMENTS"` and capture the exit code. This MUST succe
 
 ### Step 3: Estimate complexity
 
-Run `estimate_complexity "$task_json"`. If the tier is `epic`, stop and ask the user whether to split the task before continuing. If the tier is `complex`, warn the user that this task will run with full context and no parallelization.
+Run `estimate_complexity "$task_json"`. The tier output (`simple` | `standard` | `complex` | `epic`) drives downstream behavior:
+
+- `simple` / `standard` → inner loop runs with single-pass review at the end (existing behavior).
+- `complex` → inner loop runs with TDD strict (per the autopilot skill) and per-step two-stage review (Step 6.5 below). Pre-flight design analysis runs at Step 3.5.
+- `epic` → same as `complex`, plus a one-line note in the PR body under `## Complexity reassessment` recommending the user consider splitting the task in a follow-up. Autopilot does NOT stop or ask — it proceeds through the inner loop and surfaces the recommendation in the report.
+
+This step never prompts. The complexity tier is a deterministic input, not a decision point that requires user input.
+
+### Step 3.5: Pre-flight design analysis (complex / epic only)
+
+When the tier is `complex` or `epic`, scan the task description and acceptance criteria for design-ambiguity signals BEFORE creating the branch:
+
+- Phrases of the form "X or Y" in the description where both X and Y are presented as valid (e.g. "use approach A or approach B").
+- Acceptance criteria using "should" / "could" / "may" without specifying how (e.g. "the parser should handle malformed input" without a precise behavior).
+- Multiple valid implementation paths called out explicitly in the description.
+
+For each ambiguity detected, the implementer subagent (spawned in Step 6) makes the call deterministically using these tie-breakers, in order:
+
+1. **Existing pattern in the codebase** — pick the option that matches an established convention. Cite the file:line that established the pattern.
+2. **Project conventions** — bash 3.2 portability and BSD coreutils trump elegance. Prefer the more portable option even if uglier.
+3. **Smaller diff** — if both options are equally portable and equally idiomatic, pick the one that touches fewer lines / fewer files.
+4. **Explicit fallback** — if even the smaller-diff tie-breaker is ambiguous, pick the option listed FIRST in the AC text.
+
+The implementer documents each resolved ambiguity in the PR body under a `## Design ambiguities resolved` section with three columns: ambiguity, option chosen, tie-breaker rule applied. The user reviews this section at PR review time and can request a redesign if the tie-breaker produced the wrong call — that's the escalation path, not a mid-flight prompt.
+
+This step never prompts. Auto-mode is hand-off; design choices are surfaced after the fact in the PR description, not asked during execution.
+
+If `superpowers:brainstorming` skill is detected as installed AND the user has explicitly opted in via a config flag (default OFF), the implementer MAY invoke the skill in-band to capture deeper reasoning. The default behavior remains zero-prompt deterministic resolution.
 
 ### Step 4: Create the working branch from main
 
