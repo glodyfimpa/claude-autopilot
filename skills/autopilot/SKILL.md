@@ -15,7 +15,7 @@ Used by `/autopilot-task` and every subagent spawned by `/autopilot-sprint`. The
 
 1. **ANALYZE** the task before writing code. Read the relevant files, understand the surrounding context, map out dependencies.
 2. **PLAN** the changes: which files to modify, in what order, and how they depend on each other.
-3. **IMPLEMENT** in logical, coherent blocks. Never mix unrelated edits into the same iteration.
+3. **IMPLEMENT** in logical, coherent blocks. Never mix unrelated edits into the same iteration. **For `complex` and `epic` tier tasks, IMPLEMENT runs in TDD strict mode** — see "TDD discipline" below. For `standard` and `simple` tier, TDD is recommended but not enforced.
 4. The Stop hook automatically runs the quality gates: `test`, `lint`, `types`, `build`. The specific commands come from the detected stack.
 5. If the Stop hook blocks you, read the error carefully and fix the specific problem. Do not rewrite large sections hoping to "make it work".
 6. When all gates pass, run the **code quality adapter** (`lib/code-quality-adapter.sh`). The adapter dispatches to the configured provider (SonarQube, Semgrep, CodeClimate, or none) and enters a retry loop: scan, review issues, fix, re-scan, up to 5 iterations. If issues remain after 5 iterations, STOP and report the findings. Do not write the task-complete marker.
@@ -24,6 +24,29 @@ Used by `/autopilot-task` and every subagent spawned by `/autopilot-sprint`. The
 9. When code quality, simplification, and frontend verification pass AND every acceptance criterion is satisfied, call the `security-reviewer` subagent: *"use a security-reviewer subagent to check the changes"*.
 10. **Real-data smoke test** — before declaring the task complete, exercise at least ONE assumption against the actual external resource the code depends on. See "Real-data smoke test" below.
 11. When the security review has no blocking findings AND the smoke test confirmed real-world behavior matches the fixtures (or the smoke step was a no-op for an internal-only task), write the task-complete marker file (see below). This tells the Stop hook to let the outer loop commit and open the PR.
+
+### TDD discipline
+
+The IMPLEMENT step (#3 above) operates in one of two modes depending on the task's complexity tier. The tier is the output of `estimate_complexity` (see `lib/complexity-estimator.sh`), already computed by `/autopilot-task` Step 3 and available before the inner loop starts. There is no separate config flag — the gate is the complexity tier.
+
+**Tier `complex` or `epic` → TDD strict (mandatory).** For each logical unit of change inside IMPLEMENT, follow this cycle:
+
+1. **RED** — write the failing test FIRST. Run the test and confirm it fails for the expected reason (not a syntax error, not a missing import — the assertion fails). Capture the failure output as evidence.
+2. **GREEN** — write the MINIMUM implementation that turns the test green. No anticipated functionality, no unrelated cleanup. Re-run the test and confirm it passes.
+3. **REFACTOR** — clean up the implementation only after green. Re-run the test after each refactor.
+4. **COMMIT** — commit the unit (test + implementation together, or test commit immediately followed by implementation commit). One logical unit per commit.
+
+Repeat the RED → GREEN → REFACTOR → COMMIT cycle for every logical unit inside the task. The git log of a `complex` or `epic` task should show test changes preceding (or co-located with) implementation changes for every commit; this is verifiable by reading `git log --stat` after the run.
+
+**Tier `standard` or `simple` → TDD optional.** Trivial changes (renames, doc-only edits, single-line config changes, dependency bumps) don't pay the round-trip cost of test-first. Write the change, run the existing suite, move on. The Stop hook still enforces gates green at the end.
+
+**Edge cases.**
+
+- **Doc-only or markdown-only tasks at any tier** — TDD strict does not apply. There is nothing to test in the unit sense. The gate becomes "the bats suite stays green" at the end of the inner loop.
+- **Tasks that introduce a new file with no test surface** (e.g. a new prompt template, a new skill description) — same as doc-only: no per-unit TDD, suite stays green at the end.
+- **Tasks where complexity was estimated wrong** — if during ANALYZE you realize the task is a 10-line change misclassified as `complex`, document the mismatch in the PR body under a `## Complexity reassessment` section and operate at the actual tier. Do not fight TDD strict for a 10-line change just because the estimator said `complex`.
+
+The point of TDD strict at `complex`/`epic` tier is that the design feedback from writing the test first catches bugs that code-first leaves invisible. The 2026-04-29 fix sprint for `task_storage_list` proved this: the same bugs that were caught by test-first (Draft normalization, JQL double-AND) would have shipped under code-first. Reserve the discipline for the work where it pays back.
 
 ### Real-data smoke test
 
