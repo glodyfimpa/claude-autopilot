@@ -1,9 +1,12 @@
 ---
 id: TASK-1777468663003
-title: 'autopilot-task: two-stage review (spec compliance + code quality) for complex tasks'
-status: To Do
+title: >-
+  autopilot-task: two-stage review (spec compliance + code quality) for complex
+  tasks
+status: In Progress
 assignee: []
 created_date: '2026-04-29 13:30'
+updated_date: '2026-04-30 11:35'
 labels:
   - enhancement
   - command

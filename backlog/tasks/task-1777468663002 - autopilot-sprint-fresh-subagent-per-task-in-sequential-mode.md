@@ -1,9 +1,10 @@
 ---
 id: TASK-1777468663002
 title: 'autopilot-sprint: fresh subagent per task in sequential mode'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-04-29 13:30'
+updated_date: '2026-04-30 11:34'
 labels:
   - enhancement
   - command

@@ -1,9 +1,10 @@
 ---
 id: TASK-1777468663004
 title: 'autopilot-task: pre-flight design checkpoint for complex tasks'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-04-29 13:30'
+updated_date: '2026-04-30 11:35'
 labels:
   - enhancement
   - command
