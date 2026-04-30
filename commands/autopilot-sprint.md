@@ -80,6 +80,35 @@ Run `task_storage_list ready`. The adapter validates the canonical status (`read
 
 For each task, call `estimate_complexity` and attach the result as a `complexity` field on the task JSON. Keep the enriched array.
 
+### Step 3.5: Deterministic scope filtering
+
+Source `lib/scope-filter.sh` and call `scope_filter_apply "$enriched_tasks_json"`. The filter returns:
+
+```json
+{
+  "kept": ["TASK-001", "TASK-002", ...],
+  "excluded": [
+    {"id": "TASK-X", "rule": "A", "reason": "explicit precondition unmet (...)"},
+    {"id": "TASK-Y", "rule": "B", "reason": "deliverable targets a repository ..."}
+  ]
+}
+```
+
+Replace the enriched task array with the `kept` subset. Keep the `excluded` list for the run summary and the final PR description.
+
+The filter applies four deterministic rules (regex/graph driven; conservative — false negatives preferred over false positives):
+
+- **Rule A — explicit precondition not satisfied**: task description contains an anchor like "don't build until X" / "wait until X" / "blocked until X" combined with a future-condition signal (count, "more", "have happened"). Excluded.
+- **Rule B — deliverable outside current repo**: task description names an external project (Freelance Compass, RESEVO, bnb-investment-toolkit, life-os, ...) AND either an action verb (run/validate/build/deploy/...) targeting it OR a nominalized deliverable ("validation report on <project>"). Excluded.
+- **Rule C — broken dependency**: task declares a dependency on an id that is not present in the current ready list. Excluded.
+- **Rule D — contradictory ACs**: reserved for future use; not yet implemented.
+
+Tasks not matching any rule pass through unchanged. **The filter never prompts the user.** Auto-mode is hand-off — exclusions are reported in the final summary and PR body, not asked mid-flight.
+
+If `excluded` is non-empty, surface it once at this point in a tabular log line per excluded task (`[scope-filter] EXCLUDED <id> rule=<X> reason="<text>"`) so the user sees why the queue shrank when they review the run output.
+
+If after filtering the `kept` list is empty, stop and tell the user the queue had only excluded tasks, naming each.
+
 ### Step 4: Plan execution
 
 Call `plan_execution "$enriched_tasks_json"` and capture the plan:
@@ -101,9 +130,9 @@ Show the user:
 - The group layout (which tasks share a lane)
 - An estimated token budget warning when the number of parallel lanes is high
 
-#### Step 5.1: Detect file overlap and offer a PR strategy
+#### Step 5.1: Detect file overlap and select a PR strategy
 
-Before asking for confirmation, run the overlap detector on the enriched task array:
+Run the overlap detector on the enriched task array:
 
 ```bash
 overlap="$(compute_overlap "$enriched_tasks_json")"
@@ -117,25 +146,64 @@ recommendation="$(recommend_pr_strategy "$enriched_tasks_json")"
 - `metricOverlaps` — list of `{line, tasks}` records, one per shared metric line that 2+ tasks would touch even when they share no source files. Known metrics: `README.md` test count, `.claude-plugin/plugin.json` version field, `CHANGELOG.md` top entry. This catches the v0.6.0 regression where 3 PRs each bumped `Current state: NNN tests` and the second/third inherited a guaranteed merge conflict despite touching different `lib/` files.
 - `hasOverlap` — boolean shortcut, true when EITHER `overlaps` OR `metricOverlaps` is non-empty.
 
-Behavior:
+PR strategy selection (zero-prompt — auto-mode hand-off):
 
-- **`hasOverlap == false`** → no warning. Silently set strategy = **(a) separate PRs**. Do NOT prompt the user to pick a strategy. Proceed directly to the batch-spawn confirmation gate at the start of Step 6.
-- **`hasOverlap == true`** → show the user BOTH the file-overlap matrix and the metric-overlap matrix (same `{file/line, tasks}` format), then ask which PR strategy to use:
-  - **(a) Separate PRs** — current behavior, one PR per task. Reviewer handles conflicts.
-  - **(b) Bundled PR** (recommended when one overlap cluster covers all/most tasks, OR when only metric overlap is present) — all tasks run in their own worktree branches, then their commits are cherry-picked sequentially into a single integration branch (`integration/sprint-<timestamp>`); conflicts are resolved during integration; one PR is opened listing all tasks.
-  - **(c) Grouped PRs** (recommended when there are multiple disjoint file-overlap clusters) — `group_by_overlap` partitions tasks into clusters; one PR per cluster, following the bundled flow within each.
+- **`hasOverlap == false`** → set strategy = **(a) separate PRs** silently.
+- **`hasOverlap == true`** → set strategy = output of `recommend_pr_strategy` (typically **(b) bundled** when one cluster dominates or only metric overlap is present; **(c) grouped** when there are multiple disjoint clusters). Log the overlap matrix and the chosen strategy to the run output for transparency, but do NOT prompt the user.
 
-`recommend_pr_strategy` returns `bundled` whenever file overlap is empty but metric overlap covers 2+ tasks — bundling avoids the cascading single-line conflicts. Use it as the default suggestion; the user can override.
+The autopilot's hand-off contract requires that strategy choice be deterministic. `recommend_pr_strategy` is the single source of truth; if the user disagrees with the recommendation in a particular run, the corrective path is post-hoc PR review (request a re-roll or manual rebase), not a mid-execution prompt.
 
-When `hasOverlap == true` and the user has chosen a strategy, surface the chosen strategy together with the batch-spawn confirmation in Step 6 (single yes/no gate). The strategy choice itself is NOT a separate confirmation step.
+The chosen strategy is then surfaced together with the decision summary at Step 6.
 
-### Step 6: Batch-spawn confirmation gate
+### Step 6: Batch-spawn decision point
 
-Before any of Steps 6a–6d run, present a single yes/no prompt summarizing: number of tasks, plan strategy (sequential/parallel), PR strategy ((a)/(b)/(c)), integration branch name (if applicable). This is the **only** confirmation gate in the sprint flow — no earlier strategy/overlap prompt counts as confirmation. On `no`, stop without spawning any subagent or worktree.
+Before any of Steps 6a–6d run, **declare** (do not prompt) a single decision summary line and proceed:
+
+```
+[autopilot-sprint] proceeding: N tasks, plan=<sequential|parallel>, pr-strategy=<separate|bundled|grouped>, integration-branch=<name|n/a>
+```
+
+Auto-mode is hand-off: the decision is informed (already shaped by Step 1.5 git check, Step 3.5 scope filtering, Step 4 planner output, Step 5.1 overlap detection / strategy recommendation) and announced for transparency, but no user input is required. The previous "confirmation gate" wording — single yes/no prompt before spawn — is replaced because waiting on a prompt mid-execution defeats the hand-off contract that defines `/autopilot-sprint`'s purpose.
+
+If a strategy step earlier in the flow flagged user input (e.g. an `hasOverlap == true` situation when running in INTERACTIVE mode, not auto-mode), that prompt happens at Step 5.1 — never here. In auto-mode `hasOverlap == true` ALSO skips the prompt: the controller takes the `recommend_pr_strategy` output as authoritative and proceeds.
+
+The `excluded` list from Step 3.5 (if any) is captured for the final report. Excluded tasks remain in their original status (typically `ready`) so the user can re-run them manually with `/autopilot-task <ref>` after reviewing the report.
 
 ### Step 6a: Sequential execution
 
-When the plan strategy is `sequential`, iterate the groups in order and run each task through `/autopilot-task <ref>` one after another. Stop the batch if any task fails gates after max iterations.
+When the plan strategy is `sequential` and the chosen PR strategy is **(a) Separate PRs**, iterate the groups in order and spawn one isolated subagent per task using the `Agent` tool with `isolation: "worktree"`. Same dispatch pattern as Step 6b (parallel) — the only difference is **maxConcurrency = 1**, so the controller dispatches the next subagent only after the previous one has finished.
+
+Do NOT recursively invoke `/autopilot-task <ref>` from inside the same session. The recursive invocation pattern (used in earlier versions) inherits the controller's full session context across tasks, which leaks state from task N into task N+1. The fresh-subagent pattern matches Step 6b's architecture and the discipline confirmed by the 2026-04-29 fix sprint (11 isolated subagents, zero cross-task drift, two real bugs caught at per-task review).
+
+**Per-task subagent prompt** — the controller curates each subagent's prompt from this template:
+
+```
+You are an autopilot implementer subagent for ONE task. Run the inner-loop
+defined in the `autopilot` skill (`skills/autopilot/SKILL.md`) and stop at
+the task-complete marker. Do NOT push and do NOT open a PR — that is the
+controller's job.
+
+Task ref: <id>
+Title: <title>
+Description: <description verbatim>
+Acceptance criteria: <numbered list verbatim>
+Complexity tier: <tier>  # determines whether TDD strict applies
+
+Project conventions:
+- bash 3.2 + BSD coreutils (macOS) — NO bash 4+ syntax, NO declare -A,
+  NO mapfile, sed -i needs a suffix.
+- Tests: bats-core. Run `bats tests/lib/` for the full suite.
+- Worktree path: <absolute path injected by the Agent tool>.
+
+When done, write the marker file `~/.claude/.autopilot-task-complete` and
+return a structured summary: files changed, commit hash, gate results.
+```
+
+The controller waits for each subagent to complete before dispatching the next. If a subagent fails the inner-loop gates after max iterations (defined by the skill), STOP the batch and report the failure — do not dispatch the next task. Failed tasks remain in `in_progress` status so the user can resume them with `/autopilot-task <ref>` after fixing the blocker.
+
+**Parity with Step 6b.** Sequential and parallel modes share the same per-task contract: one Agent tool invocation, one worktree, one commit, no push, no PR. The only difference is the dispatch concurrency — `maxConcurrency = 1` for sequential, `maxConcurrency = plan.maxConcurrency` for parallel. This parity simplifies reasoning about the sprint flow: whether tasks run one at a time or in fan-out, the per-task agent looks the same.
+
+**Worktree cleanup.** After each subagent completes (success or failure), the controller cleans up the worktree following the standard pattern: `cd <main repo>` → `git worktree remove <path>` (or `rm -rf <path> && git worktree prune` on git < 2.17). The integration branch (or per-task branches in (a) Separate PRs) keeps the commits.
 
 ### Step 6b: Parallel execution
 
@@ -177,17 +245,28 @@ This matrix gap was first encountered during the v0.7.0 follow-up sprint (2026-0
 
 ### Step 7: Summary
 
-Print a table:
+Print TWO tables:
 
+**Executed tasks:**
 - Task ref
 - Final status (done / failed)
 - PR URL (if done)
 - Failure reason (if failed)
 
-Remind the user that failed tasks are back in `ready` state and can be retried individually with `/autopilot-task <ref>`.
+**Excluded by scope filter (Step 3.5):**
+- Task ref
+- Rule (A / B / C / D)
+- Reason (one line)
+- Re-include command (`/autopilot-task <ref>`)
+
+If `excluded` is empty, omit the second table.
+
+The bundled or grouped PR description (when applicable) MUST also include the excluded list under a `## Excluded from this sprint` section, so reviewers can audit the filter's decisions and the user has a permanent record beyond the terminal output.
+
+Remind the user that failed tasks are in `in_progress` state and can be resumed individually with `/autopilot-task <ref>`. Excluded tasks remain in their original state (typically `ready`) and can be re-attempted via the same command after the user verifies the precondition is satisfied or the rule no longer applies.
 
 ## Error handling
 
 - If the task storage provider doesn't support `list`, fail fast with a helpful message telling the user to add tasks via `/autopilot-prd` first, or switch to a storage that supports listing.
 - If a parallel subagent crashes, its worktree must still be cleaned up. Use a cleanup phase that runs regardless of outcome.
-- If the token budget estimate exceeds the configured cap, require explicit user confirmation before proceeding.
+- If the token budget estimate exceeds the configured cap, log a `[autopilot-sprint] WARNING: estimated token budget <X> exceeds configured cap <Y> — proceeding anyway under auto-mode hand-off` line and proceed. Do NOT prompt the user. The cap is informational; if the user wants the cap to be enforced, they should switch to interactive mode or lower the parallel concurrency in `.autopilot-pipeline.json`.

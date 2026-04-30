@@ -154,6 +154,23 @@ Branching is never negotiable: each task starts from `main`, never from a featur
 
 Complexity estimation favors caution: trivial batches run sequentially (parallel overhead is not worth it), complex tasks force sequential execution (they need full context), and the adaptive strategy parallelizes only when all tasks are standard and share no files with each other.
 
+### Hand-off contract — zero prompts in auto-mode
+
+`/autopilot-task`, `/autopilot-sprint`, `/autopilot-prd`, and `/autopilot-run` are hand-off commands: the user launches the command, walks away, comes back to a PR. None of them prompt the user mid-execution. Decisions that historically required user input (PR strategy choice on overlap, complexity-tier warnings, budget cap, manual-review acknowledgment) are now resolved deterministically and surfaced in the run output and the final PR description.
+
+When `/autopilot-sprint` runs, scope filtering removes tasks that the autopilot cannot honor without input (`lib/scope-filter.sh`):
+
+| Rule | Trigger | Reason |
+|------|---------|--------|
+| **A** | Description contains an "until" anchor (`don't build until`, `wait until`, `blocked until`) AND a future-condition signal (`have happened`, `more`, a count) | Explicit precondition unmet |
+| **B** | Description names a known external project (Freelance Compass, RESEVO, ...) AND either an action verb on it (run/validate/build/...) or a nominalized deliverable (`validation report on <project>`) | Deliverable targets a different repository |
+| **C** | Task declares a dependency on an id not present in the current ready list | Broken dependency graph |
+| **D** | Reserved (contradictory acceptance criteria) | Not yet implemented |
+
+Excluded tasks remain in their original status (`ready` typically) and are surfaced in the run summary and the final PR body's `## Excluded from this sprint` section. The user can re-run any excluded task with `/autopilot-task <ref>` after verifying the precondition is satisfied or the rule no longer applies.
+
+Design ambiguities WITHIN a task (X-or-Y phrasings, "should" without precise behavior) are resolved by `/autopilot-task` Step 3.5 using a deterministic tie-breaker chain: existing codebase pattern → portability → smaller diff → first-listed option in the AC. Each call is documented in the PR body's `## Design ambiguities resolved` table for post-hoc review.
+
 ## Structure
 
 ```
@@ -252,7 +269,7 @@ Run the full suite:
 bats tests/lib/
 ```
 
-Current state: 400 tests, all green on macOS bash 3.2.
+Current state: 409 tests, all green on macOS bash 3.2.
 
 When adding a feature:
 
